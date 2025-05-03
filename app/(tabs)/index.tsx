@@ -42,7 +42,7 @@ export default function Home() {
       </Pressable>
 
       {/* Pagar: navega a /pago */}
-      <Link href="/pago" asChild>
+      <Link href="./pago" asChild>
         <Pressable
           style={{
             backgroundColor: '#10b981',
@@ -57,7 +57,7 @@ export default function Home() {
       </Link>
 
       {/* Ver Carta: navega a /carta */}
-      <Link href="/carta" asChild>
+      <Link href="./carta" asChild>
         <Pressable
           style={{
             backgroundColor: '#3b82f6',
