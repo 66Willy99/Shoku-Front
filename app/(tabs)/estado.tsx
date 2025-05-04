@@ -1,41 +1,38 @@
-import { View, Text, Pressable } from 'react-native';
-import { Link } from 'expo-router';
-
-export default function Estado() {
-  // Aquí podrías recibir params (como número de orden) usando useSearchParams()
-  // pero de momento lo dejamos estático
-  return (
-    <View
-      style={{
-        flex: 1,
-        padding: 16,
-        backgroundColor: '#fff',
-        justifyContent: 'center',
-        alignItems: 'center',
-      }}
-    >
-      <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 12 }}>
-        ✅ Pedido realizado con éxito
-      </Text>
-      <Text style={{ fontSize: 18, marginBottom: 8 }}>ORDEN #1234</Text>
-      <Text style={{ fontSize: 16, marginBottom: 24 }}>
-        Tiempo estimado de preparación: 15 minutos
-      </Text>
-
-      <Link href="/carta" asChild>
-        <Pressable
-          style={{
-            backgroundColor: '#3b82f6',
-            paddingVertical: 10,
-            paddingHorizontal: 20,
-            borderRadius: 8,
-          }}
+import {
+    View,
+    Text,
+    ScrollView,
+    TouchableOpacity,
+    StyleSheet
+  } from 'react-native';
+  import { useRouter } from 'expo-router';
+  import { COLORS, FONT_SIZES, SPACING } from '../../theme';
+  
+  export default function Estado() {
+    const router = useRouter();
+  
+    return (
+      <ScrollView contentContainerStyle={styles.container}>
+        <Text style={styles.title}>✅ Pedido realizado</Text>
+        <Text style={styles.subtitle}>ORDEN #1234 — Mesa 5</Text>
+        <Text style={styles.info}>Tiempo estimado: 15 minutos</Text>
+  
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.push('/')}
         >
-          <Text style={{ color: 'white', fontWeight: 'bold' }}>
-            🔄 Volver a pedir
-          </Text>
-        </Pressable>
-      </Link>
-    </View>
-  );
-}
+          <Text style={styles.backText}>← Volver al inicio</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    );
+  }
+  
+  const styles = StyleSheet.create({
+    container:  { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: SPACING.md, backgroundColor: COLORS.background },
+    title:      { fontSize: FONT_SIZES.title, fontWeight: 'bold', marginBottom: SPACING.sm },
+    subtitle:   { fontSize: FONT_SIZES.body, marginBottom: SPACING.xs },
+    info:       { fontSize: FONT_SIZES.body, marginBottom: SPACING.lg },
+    backButton: { padding: SPACING.sm, backgroundColor: COLORS.primary, borderRadius: 6 },
+    backText:   { color: COLORS.white, fontSize: FONT_SIZES.body },
+  });
+  

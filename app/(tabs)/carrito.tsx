@@ -1,65 +1,68 @@
-import { View, Text, ScrollView, Pressable } from 'react-native';
-import { useCarrito } from '../../context/CarritoContext';
-import { Link, useRouter } from 'expo-router';
-
-export default function Carrito() {
-  const { carrito, limpiarCarrito } = useCarrito();
-  const router = useRouter();
-
-  const total = carrito.length;
-
-  return (
-    <ScrollView style={{ padding: 16, backgroundColor: '#fff' }}>
-      <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16 }}>🛒 Tu Carrito</Text>
-
-      {carrito.length === 0 ? (
-        <Text style={{ fontSize: 16 }}>Tu carrito está vacío.</Text>
-      ) : (
-        carrito.map((item, index) => (
-          <View
-            key={index}
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              marginBottom: 10,
-              borderBottomWidth: 1,
-              borderColor: '#ccc',
-              paddingBottom: 6,
-            }}
-          >
-            <Text>{item}</Text>
-            <Text>$X.XXX</Text>
-          </View>
-        ))
-      )}
-
-      {carrito.length > 0 && (
-        <>
-          <Text style={{ marginTop: 12, fontWeight: 'bold' }}>Total de productos: {total}</Text>
-
-          <Link href={{ pathname: '/estado' }} asChild>
-            <Pressable
-              onPress={() => limpiarCarrito()}
-              style={{
-                marginTop: 20,
-                backgroundColor: '#10b981',
-                padding: 12,
-                borderRadius: 8,
-                alignItems: 'center',
-              }}
-            >
-              <Text style={{ color: '#fff', fontWeight: 'bold' }}>✅ Realizar Pedido</Text>
-            </Pressable>
-          </Link>
-        </>
-      )}
-
-      <Pressable
-        onPress={() => router.back()}
-        style={{ marginTop: 32, alignItems: 'center' }}
-      >
-        <Text style={{ color: '#3b82f6' }}>← Volver a la carta</Text>
-      </Pressable>
-    </ScrollView>
-  );
-}
+import {
+    View,
+    Text,
+    ScrollView,
+    TouchableOpacity,
+    StyleSheet
+  } from 'react-native';
+  import { useRouter } from 'expo-router';
+  import { useCarrito } from '../../context/CarritoContext';
+  import { COLORS, FONT_SIZES, SPACING } from '../../theme';
+  
+  export default function Carrito() {
+    const router = useRouter();
+    const { carrito, limpiarCarrito } = useCarrito();
+    const totalItems = carrito.length;
+  
+    return (
+      <View style={styles.container}>
+        <Text style={styles.header}>Tu Pedido ({totalItems})</Text>
+  
+        <ScrollView style={styles.list}>
+          {carrito.map((item, i) => (
+            <View key={i} style={styles.row}>
+              <Text style={styles.itemText}>{item}</Text>
+              <Text style={styles.itemText}>$X.XXX</Text>
+            </View>
+          ))}
+        </ScrollView>
+  
+        <TouchableOpacity
+          style={styles.orderButton}
+          onPress={() => {
+            limpiarCarrito();
+            router.push('/estado');
+          }}
+        >
+          <Text style={styles.orderText}>✅ Realizar Pedido</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+  
+  const styles = StyleSheet.create({
+    container:   { flex: 1, padding: SPACING.md, backgroundColor: COLORS.white },
+    header:      { fontSize: FONT_SIZES.subtitle, fontWeight: 'bold', marginBottom: SPACING.sm },
+    list:        { flex: 1 },
+    row:         {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      borderBottomWidth: 1,
+      borderColor: COLORS.grayLight,
+      paddingVertical: SPACING.xs,
+    },
+    itemText:    { fontSize: FONT_SIZES.body },
+    orderButton: {
+      backgroundColor: COLORS.secondary,
+      padding: SPACING.md,
+      borderRadius: 8,
+      alignItems: 'center',
+      marginTop: SPACING.sm,
+    },
+    orderText:   {
+      color: COLORS.white,
+      fontSize: FONT_SIZES.body,
+      fontWeight: 'bold',
+    },
+  });
+  

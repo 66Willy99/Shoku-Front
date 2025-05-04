@@ -1,74 +1,68 @@
-// app/(tabs)/index.tsx
-
-import { View, Text, Pressable, Alert } from 'react-native';
-import { Link } from 'expo-router';
+import { View, Text, Image, TouchableOpacity, Alert, StyleSheet } from 'react-native';
+import { useRouter } from 'expo-router';
+import { COLORS, FONT_SIZES, SPACING } from '../../theme';
 
 export default function Home() {
-  const handleLlamarMesero = () => {
-    Alert.alert(
-      'Llamar a Mesero',
-      'Un garzón ha sido notificado y llegará en breve.'
-    );
-  };
+  const router = useRouter();
+
+  const llamarMesero = () =>
+    Alert.alert('Llamar a Mesero', 'Un garzón ha sido notificado.');
 
   return (
-    <View
-      style={{
-        flex: 1,
-        backgroundColor: '#fff',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 16,
-      }}
-    >
-      <Text style={{ fontSize: 32, fontWeight: 'bold', marginBottom: 32 }}>
-        Shoku
-      </Text>
+    <View style={styles.container}>
+      <Image
+        source={require('../../assets/images/shoku-logo.png')}
+        style={styles.logo}
+        resizeMode="contain"
+      />
 
-      {/* Llamar a Mesero */}
-      <Pressable
-        onPress={handleLlamarMesero}
-        style={{
-          backgroundColor: '#f59e0b',
-          paddingVertical: 12,
-          paddingHorizontal: 32,
-          borderRadius: 8,
-          marginBottom: 16,
-        }}
+      <TouchableOpacity
+        onPress={llamarMesero}
+        style={{ ...styles.button, backgroundColor: COLORS.primary }}
       >
-        <Text style={{ color: 'white', fontSize: 18 }}>
-          ☎️ Llamar a Mesero
-        </Text>
-      </Pressable>
+        <Text style={styles.buttonText}>🔔 Llamar a Mesero</Text>
+      </TouchableOpacity>
 
-      {/* Pagar: navega a /pago */}
-      <Link href="/pago" asChild>
-        <Pressable
-          style={{
-            backgroundColor: '#10b981',
-            paddingVertical: 12,
-            paddingHorizontal: 32,
-            borderRadius: 8,
-            marginBottom: 16,
-          }}
-        >
-          <Text style={{ color: 'white', fontSize: 18 }}>💳 Pagar</Text>
-        </Pressable>
-      </Link>
+      <TouchableOpacity
+        onPress={() => router.push('/pago')}
+        style={{ ...styles.button, backgroundColor: COLORS.primary }}
+      >
+        <Text style={styles.buttonText}>💳 Pagar</Text>
+      </TouchableOpacity>
 
-      {/* Ver Carta: navega a /carta */}
-      <Link href="/carta" asChild>
-        <Pressable
-          style={{
-            backgroundColor: '#3b82f6',
-            paddingVertical: 12,
-            paddingHorizontal: 32,
-            borderRadius: 8,
-          }}
-        >
-          <Text style={{ color: 'white', fontSize: 18 }}>🛒 Ver Carta</Text>
-        </Pressable>
-      </Link>
+      <TouchableOpacity
+        onPress={() => router.push('/carta')}
+        style={{ ...styles.button, backgroundColor: COLORS.primary }}
+      >
+        <Text style={styles.buttonText}>🛒 Ver Carta</Text>
+      </TouchableOpacity>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.md,
+  },
+  logo: {
+    width: 120,
+    height: 120,
+    marginBottom: SPACING.xl,
+  },
+  button: {
+    width: '70%',
+    paddingVertical: SPACING.md,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: SPACING.lg,
+  },
+  buttonText: {
+    color: COLORS.white,
+    fontSize: FONT_SIZES.body,
+    fontWeight: 'bold',
+  },
+});
