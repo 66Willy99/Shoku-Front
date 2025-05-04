@@ -1,46 +1,50 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { CartItem } from './CarritoContext';
 
-export type OrderStatus = 'pendiente' | 'preparando' | 'listo';
+export type OrderStatus = 'en progreso' | 'listo' | 'completado';
+
 export interface Order {
   id: number;
-  table: number;
-  items: string[];
+  items: CartItem[];
+  estimatedTime: number; // en minutos
+  timestamp: number;     // epoch ms
   status: OrderStatus;
 }
 
 interface OrdersContextType {
   orders: Order[];
-  setStatus: (orderId: number, status: OrderStatus) => void;
-  addOrder: (order: Omit<Order, 'id' | 'status'>) => void;
+  addOrder: (items: CartItem[], estimatedTime: number) => void;
 }
 
 const OrdersContext = createContext<OrdersContextType | null>(null);
 
 export const OrdersProvider = ({ children }: { children: ReactNode }) => {
-  const [orders, setOrders] = useState<Order[]>([
-    { id: 1, table: 5, items: ['Pasta Boloñesa'], status: 'pendiente' },
-    { id: 2, table: 2, items: ['Ensalada César', 'Jugo piña'], status: 'pendiente' },
-  ]);
+  const [orders, setOrders] = useState<Order[]>([]);
 
-  const setStatus = (orderId: number, status: OrderStatus) => {
-    setOrders((prev) =>
-      prev.map(o => o.id === orderId ? { ...o, status } : o)
-    );
-  };
+  const addOrder = (items: CartItem[], estimatedTime: number) => {
+    const id = Math.floor(1000 + Math.random() * 9000);
+    const timestamp = Date.now();
+    const newOrder: Order = { id, items, estimatedTime, timestamp, status: 'en progreso' };
+    setOrders(prev => [...prev, newOrder]);
 
-  const addOrder = ({ table, items }: Omit<Order, 'id' | 'status'>) => {
-    const nextId = Math.max(0, ...orders.map(o => o.id)) + 1;
-    setOrders(prev => [...prev, { id: nextId, table, items, status: 'pendiente' }]);
+    // Después de estimatedTime minutos ➔ status = 'listo'
+    setTimeout(() => {
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'listo' } : o));
+      // 1 minuto más ➔ status = 'completado'
+      setTimeout(() => {
+        setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'completado' } : o));
+      }, 60 * 1000);
+    }, estimatedTime * 60 * 1000);
   };
 
   return (
-    <OrdersContext.Provider value={{ orders, setStatus, addOrder }}>
+    <OrdersContext.Provider value={{ orders, addOrder }}>
       {children}
     </OrdersContext.Provider>
   );
 };
 
-export const useOrders = (): OrdersContextType => {
+export const useOrders = () => {
   const ctx = useContext(OrdersContext);
   if (!ctx) throw new Error('useOrders debe usarse dentro de OrdersProvider');
   return ctx;

@@ -1,4 +1,5 @@
 // app/_layout.tsx
+
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
@@ -7,6 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 
+import { OrdersProvider } from '../context/OrdersContext';
 import { CarritoProvider } from '../context/CarritoContext';
 
 SplashScreen.preventAutoHideAsync();
@@ -16,18 +18,27 @@ export default function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
 
-  useEffect(() => { if (loaded) SplashScreen.hideAsync(); }, [loaded]);
-  if (!loaded) return null;
+  useEffect(() => {
+    if (loaded) {
+      SplashScreen.hideAsync();
+    }
+  }, [loaded]);
+
+  if (!loaded) {
+    return null;
+  }
 
   return (
-    <CarritoProvider>
-      <ThemeProvider value={DarkTheme}>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="+not-found" options={{ title: 'No encontrado' }} />
-        </Stack>
-        <StatusBar style="auto" />
-      </ThemeProvider>
-    </CarritoProvider>
+    <OrdersProvider>
+      <CarritoProvider>
+        <ThemeProvider value={DefaultTheme}>
+          <Stack>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="+not-found" options={{ title: 'No encontrado' }} />
+          </Stack>
+          <StatusBar style="auto" />
+        </ThemeProvider>
+      </CarritoProvider>
+    </OrdersProvider>
   );
 }

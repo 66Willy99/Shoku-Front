@@ -1,12 +1,39 @@
-import { View, Text, Image, TouchableOpacity, Alert, StyleSheet } from 'react-native';
+import React from 'react';
+import {
+  View,
+  Text,
+  Image,
+  TouchableOpacity,
+  Alert,
+  Platform,
+  StyleSheet,
+} from 'react-native';
 import { useRouter } from 'expo-router';
+import { useCarrito } from '../../context/CarritoContext';
 import { COLORS, FONT_SIZES, SPACING } from '../../theme';
 
 export default function Home() {
   const router = useRouter();
+  const { carrito } = useCarrito();
+  const hasItems = carrito.length > 0;
 
-  const llamarMesero = () =>
-    Alert.alert('Llamar a Mesero', 'Un garzón ha sido notificado.');
+  const llamarMesero = () => {
+    const title = 'Mesero en camino';
+    const message = 'Tiempo estimado: 3 minutos.';
+    if (Platform.OS === 'web') {
+      window.alert(`${title}\n\n${message}`);
+    } else {
+      Alert.alert(title, message);
+    }
+  };
+
+  const handlePago = () => {
+    if (!hasItems) {
+      Alert.alert('Carrito vacío', 'Agrega productos antes de pagar.');
+      return;
+    }
+    router.push('/pago');
+  };
 
   return (
     <View style={styles.container}>
@@ -18,21 +45,31 @@ export default function Home() {
 
       <TouchableOpacity
         onPress={llamarMesero}
-        style={{ ...styles.button, backgroundColor: COLORS.primary }}
+        style={[styles.button, { backgroundColor: COLORS.primary }]}
       >
         <Text style={styles.buttonText}>🔔 Llamar a Mesero</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
-        onPress={() => router.push('/pago')}
-        style={{ ...styles.button, backgroundColor: COLORS.primary }}
+        onPress={handlePago}
+        style={{
+          ...styles.button,
+          backgroundColor: hasItems ? COLORS.primary : COLORS.grayLight,
+        }}
       >
-        <Text style={styles.buttonText}>💳 Pagar</Text>
+        <Text
+          style={{
+            ...styles.buttonText,
+            color: hasItems ? COLORS.white : COLORS.grayDark,
+          }}
+        >
+          💳 Pagar
+        </Text>
       </TouchableOpacity>
 
       <TouchableOpacity
         onPress={() => router.push('/carta')}
-        style={{ ...styles.button, backgroundColor: COLORS.primary }}
+        style={[styles.button, { backgroundColor: COLORS.primary }]}
       >
         <Text style={styles.buttonText}>🛒 Ver Carta</Text>
       </TouchableOpacity>
@@ -61,7 +98,6 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   buttonText: {
-    color: COLORS.white,
     fontSize: FONT_SIZES.body,
     fontWeight: 'bold',
   },
