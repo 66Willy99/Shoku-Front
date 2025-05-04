@@ -25,8 +25,8 @@ export const Colors = {
   },
   // Custom colors
   primary: '#ee7b6c',
-  secondary: 'fa6a5a',
-  light_primary: 'f3d5b3',
+  secondary: '#fa6a5a',
+  light_primary: '#f3d5b3',
   bg_light: '#eee9e5',
   coffee: '#d89c6c',
   yellow: '#ffc94d',

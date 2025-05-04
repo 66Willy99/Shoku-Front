@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Colors } from '../../constants/Colors'; // Asegúrate de que la ruta sea correcta
+import Icon from '../../components/ui/Icon'; // Asegúrate de que la ruta sea correcta
 
 const LoginScreen = ({ navigation }: { navigation: any }) => {
   const [email, setEmail] = useState<string>('');
@@ -22,7 +23,13 @@ const LoginScreen = ({ navigation }: { navigation: any }) => {
 
   return (
     <View style={styles.container}>
-        <View style={styles.primarySection} />
+        <View style={styles.primarySection}>
+            <Icon color={Colors.light_primary} size={400} />
+            <View>
+              <Text style={styles.titleText}>Shoku - 1.0.0</Text>
+              <Text style={styles.titleText}>Gestor de restaurante</Text>
+            </View>
+        </View>
 
         <View style={styles.secondarySection}>
             <TextInput
@@ -88,7 +95,9 @@ const styles = StyleSheet.create({
   },
   primarySection: {
     flex: 1,
-    backgroundColor: Colors.primary
+    backgroundColor: Colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
     secondarySection: {
         flex: 1,
@@ -96,6 +105,12 @@ const styles = StyleSheet.create({
         padding: 20,
         justifyContent: 'center',
     },
+  titleText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: Colors.bg_light,
+  }
+
 });
 
 export default LoginScreen; // Exportamos como componente de pantalla
