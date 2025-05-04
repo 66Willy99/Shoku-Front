@@ -8,7 +8,7 @@ if (Platform.OS !== 'web') {
 
 return (
     <View style={styles.container}>
-        <Text style={styles.title}>Panel de Administración (Solo Web)</Text>
+        <Text style={styles.title}>Reportes (Solo Web)</Text>
     </View>
 );
 }
