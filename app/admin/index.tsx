@@ -24,8 +24,8 @@ const LoginScreen = ({ navigation }: { navigation: any }) => {
   return (
     <View style={styles.container}>
         <View style={styles.primarySection}>
-            <Icon color={Colors.light_primary} size={400} />
-            <View>
+            <Icon color={Colors.light_primary} size={350} />
+            <View style={{marginTop: 100 }}>
               <Text style={styles.titleText}>Shoku - 1.0.0</Text>
               <Text style={styles.titleText}>Gestor de restaurante</Text>
             </View>
@@ -106,9 +106,9 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
   titleText: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 28,
     color: Colors.bg_light,
+    fontFamily: 'BalooBold',
   }
 
 });
