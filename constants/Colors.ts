@@ -30,4 +30,5 @@ export const Colors = {
   bg_light: '#eee9e5',
   coffee: '#d89c6c',
   yellow: '#ffc94d',
+  grey: '#a4a3a3',
 };

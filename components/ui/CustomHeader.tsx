@@ -1,21 +1,25 @@
 // components/CustomHeader.tsx
 import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
-import { Link } from 'expo-router';
+import { Link, usePathname } from 'expo-router';
+import { Colors } from '../../constants/Colors'
 
-export default function CustomHeader() {
+export default function CustomHeader({ excludeRoutes = [] }: { excludeRoutes?: string[] }) {
+    const pathname = usePathname();
+
+    if(excludeRoutes.includes(pathname)){
+        return null;
+    }
+
     return (
         <SafeAreaView style={styles.safeArea}>
             <View style={styles.header}>
                 <Text style={styles.title}>Shoku Admin</Text>
                 <View style={styles.nav}>
-                    <Link href="/admin" style={styles.navLink}>
-                        <Text>Inicio</Text>
+                    <Link href="/admin/reports" style={styles.navLink}>
+                        <Text>Reportes</Text>
                     </Link>
                     <Link href="/admin/add-restaurant" style={styles.navLink}>
                         <Text>Añadir Restaurante</Text>
-                    </Link>
-                    <Link href="/admin/reports" style={styles.navLink}>
-                        <Text>Reportes</Text>
                     </Link>
                 </View>
             </View>
@@ -25,14 +29,14 @@ export default function CustomHeader() {
 
 const styles = StyleSheet.create({
     safeArea: {
-        backgroundColor: '#ee7b6c',
+        backgroundColor: Colors.primary,
     },
     header: {
         height: 80,
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 20,
-        backgroundColor: '#ee7b6c',
+        backgroundColor: Colors.primary,
     },
     title: {
         fontSize: 20,
@@ -49,7 +53,7 @@ const styles = StyleSheet.create({
         fontFamily: 'BalooBold',
         padding: 8,
         borderRadius: 4,
-        color: '#f3d5b3',
+        color: Colors.light_primary,
         paddingRight: 0,
     },
 });
