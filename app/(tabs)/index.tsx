@@ -1,38 +1,22 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   Image,
   TouchableOpacity,
-  Alert,
-  Platform,
+  Modal,
   StyleSheet,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useCarrito } from '../../context/CarritoContext';
 import { COLORS, FONT_SIZES, SPACING } from '../../theme';
 
 export default function Home() {
   const router = useRouter();
-  const { carrito } = useCarrito();
-  const hasItems = carrito.length > 0;
+  const [waiterModal, setWaiterModal] = useState(false);
 
-  const llamarMesero = () => {
-    const title = 'Mesero en camino';
-    const message = 'Tiempo estimado: 3 minutos.';
-    if (Platform.OS === 'web') {
-      window.alert(`${title}\n\n${message}`);
-    } else {
-      Alert.alert(title, message);
-    }
-  };
-
-  const handlePago = () => {
-    if (!hasItems) {
-      Alert.alert('Carrito vacío', 'Agrega productos antes de pagar.');
-      return;
-    }
-    router.push('/pago');
+  const showWaiter = () => {
+    setWaiterModal(true);
+    setTimeout(() => setWaiterModal(false), 2000);
   };
 
   return (
@@ -43,36 +27,43 @@ export default function Home() {
         resizeMode="contain"
       />
 
+      {/* Llamar a Mesero */}
       <TouchableOpacity
-        onPress={llamarMesero}
+        onPress={showWaiter}
         style={[styles.button, { backgroundColor: COLORS.primary }]}
       >
         <Text style={styles.buttonText}>🔔 Llamar a Mesero</Text>
       </TouchableOpacity>
 
+      {/* Pagar (deshabilitado si no hay productos) */}
       <TouchableOpacity
-        onPress={handlePago}
-        style={{
-          ...styles.button,
-          backgroundColor: hasItems ? COLORS.primary : COLORS.grayLight,
-        }}
+        onPress={() => router.push('/pago')}
+        style={[styles.button, { backgroundColor: COLORS.primary }]}
       >
-        <Text
-          style={{
-            ...styles.buttonText,
-            color: hasItems ? COLORS.white : COLORS.grayDark,
-          }}
-        >
-          💳 Pagar
-        </Text>
+        <Text style={styles.buttonText}>💳 Pagar</Text>
       </TouchableOpacity>
 
+      {/* Ver Carta */}
       <TouchableOpacity
         onPress={() => router.push('/carta')}
         style={[styles.button, { backgroundColor: COLORS.primary }]}
       >
         <Text style={styles.buttonText}>🛒 Ver Carta</Text>
       </TouchableOpacity>
+
+      <Modal
+        visible={waiterModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setWaiterModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Mesero en camino</Text>
+            <Text style={styles.modalMsg}>⏰ Tiempo estimado: 3 minutos</Text>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -98,7 +89,30 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   buttonText: {
+    color: COLORS.white,
     fontSize: FONT_SIZES.body,
     fontWeight: 'bold',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalBox: {
+    backgroundColor: COLORS.white,
+    padding: SPACING.lg,
+    borderRadius: 12,
+    alignItems: 'center',
+    width: '80%',
+  },
+  modalTitle: {
+    fontSize: FONT_SIZES.subtitle,
+    fontWeight: 'bold',
+    marginBottom: SPACING.sm,
+  },
+  modalMsg: {
+    fontSize: FONT_SIZES.body,
+    color: COLORS.grayDark,
   },
 });

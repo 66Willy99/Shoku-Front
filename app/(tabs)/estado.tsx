@@ -14,11 +14,12 @@ import { useOrders, Order } from '../../context/OrdersContext';
 import { COLORS, FONT_SIZES, SPACING } from '../../theme';
 
 const STEPS = [
-  { key: 'confirmed', icon: 'check-circle', label: 'Pedido confirmado' },
-  { key: 'preparing', icon: 'silverware-fork-knife', label: 'En preparación' },
-  { key: 'finished', icon: 'clock-end', label: 'Terminado' },
-  { key: 'delivered', icon: 'truck-delivery', label: 'Entregado' },
+  { key: 'confirmed', icon: 'check-circle',           label: 'Pedido confirmado' },
+  { key: 'preparing', icon: 'silverware-fork-knife',  label: 'En preparación' },
+  { key: 'finished',  icon: 'clock-end',              label: 'Terminado' },
+  { key: 'delivered', icon: 'food-fork-drink',        label: 'Entregado' },  // icon de plato servido
 ];
+
 const STATUS_INDEX: Record<Order['status'], number> = {
   'en progreso': 1,
   'listo':       2,
@@ -29,6 +30,7 @@ export default function Estado() {
   const router = useRouter();
   const { orders } = useOrders();
 
+  // Para actualizar el tiempo restante cada segundo
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const iv = setInterval(() => setNow(Date.now()), 1000);
@@ -56,7 +58,6 @@ export default function Estado() {
         const idx = STATUS_INDEX[o.status];
         return (
           <View key={o.id} style={styles.section}>
-            {/* Cabecera coral */}
             <Text style={styles.sectionTitle}>Datos de tu pedido</Text>
             <View style={styles.infoRow}>
               <MaterialCommunityIcons name="receipt" size={20} color={COLORS.white} />
@@ -65,7 +66,7 @@ export default function Estado() {
             <View style={styles.infoRow}>
               <MaterialCommunityIcons name="currency-usd" size={20} color={COLORS.white} />
               <Text style={styles.infoText}>
-                Total: ${o.items.reduce((s,i)=>s + i.price*i.quantity,0).toLocaleString()}
+                Total: ${o.items.reduce((s, i) => s + i.price * i.quantity, 0).toLocaleString()}
               </Text>
             </View>
             <View style={styles.infoRow}>
@@ -75,39 +76,41 @@ export default function Estado() {
               </Text>
             </View>
 
-            {/* Timeline */}
             <View style={styles.timelineCard}>
-              {STEPS.map((step, i) => (
-                <View key={step.key} style={styles.stepContainer}>
-                  <View style={styles.iconColumn}>
-                    <MaterialCommunityIcons
-                      name={step.icon as any}
-                      size={24}
-                      color={i <= idx ? COLORS.primary : COLORS.grayLight}
-                    />
-                    {i < STEPS.length - 1 && (
-                      <View
-                        style={[
-                          styles.line,
-                          { backgroundColor: i < idx ? COLORS.primary : COLORS.grayLight },
-                        ]}
+              {STEPS.map((step, i) => {
+                const isActive = i <= idx;
+                return (
+                  <View key={step.key} style={styles.stepContainer}>
+                    <View style={styles.iconColumn}>
+                      <MaterialCommunityIcons
+                        name={step.icon as any}
+                        size={24}
+                        color={isActive ? COLORS.primary : COLORS.grayLight}
                       />
-                    )}
+                      {i < STEPS.length - 1 && (
+                        <View
+                          style={[
+                            styles.line,
+                            { backgroundColor: i < idx ? COLORS.primary : COLORS.grayLight },
+                          ]}
+                        />
+                      )}
+                    </View>
+                    <Text
+                      style={[
+                        styles.stepLabel,
+                        { color: isActive ? COLORS.primary : COLORS.grayDark },
+                      ]}
+                    >
+                      {step.label}
+                      {i === 0 && ` — ${formatTime(o.timestamp)}`}
+                      {i === idx && o.status === 'en progreso'
+                        ? ` (resta ${remaining(o)})`
+                        : ''}
+                    </Text>
                   </View>
-                  <Text
-                    style={[
-                      styles.stepLabel,
-                      { color: i <= idx ? COLORS.primary : COLORS.grayDark },
-                    ]}
-                  >
-                    {step.label}
-                    {i === 0 && ` — ${formatTime(o.timestamp)}`}
-                    {i === idx && o.status === 'en progreso'
-                      ? ` (resta ${remaining(o)})`
-                      : ''}
-                  </Text>
-                </View>
-              ))}
+                );
+              })}
             </View>
 
             {o.notes ? (
@@ -178,15 +181,15 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     marginVertical: SPACING.sm,
   },
-  stepContainer: { flexDirection: 'row', alignItems: 'center', marginVertical: SPACING.xs },
-  iconColumn:     { alignItems: 'center', marginRight: SPACING.sm },
-  line:           { width: 2, flex: 1, marginTop: SPACING.xs },
-  stepLabel:      { fontSize: FONT_SIZES.body },
+  stepContainer:{ flexDirection: 'row', alignItems: 'center', marginVertical: SPACING.xs },
+  iconColumn:   { alignItems: 'center', marginRight: SPACING.sm },
+  line:         { width: 2, flex: 1, marginTop: SPACING.xs },
+  stepLabel:    { fontSize: FONT_SIZES.body },
 
-  notes:       { fontStyle: 'italic', marginTop: SPACING.sm },
+  notes:        { fontStyle: 'italic', marginTop: SPACING.sm },
 
-  historyCard:   { backgroundColor: COLORS.white, padding: SPACING.sm, borderRadius: 8, marginBottom: SPACING.sm },
-  historyTitle:  { fontWeight: 'bold', marginBottom: SPACING.xs },
+  historyCard:  { backgroundColor: COLORS.white, padding: SPACING.sm, borderRadius: 8, marginBottom: SPACING.sm },
+  historyTitle: { fontWeight: 'bold', marginBottom: SPACING.xs },
 
   backButton:   {
     marginTop: SPACING.lg,
@@ -195,5 +198,5 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     alignItems: 'center',
   },
-  backText:      { color: COLORS.white, fontSize: FONT_SIZES.body },
+  backText:     { color: COLORS.white, fontSize: FONT_SIZES.body },
 });
