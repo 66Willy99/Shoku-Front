@@ -1,9 +1,12 @@
-import React, { useMemo } from 'react';
+// app/(tabs)/carrito.tsx
+
+import React from 'react';
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
+  TextInput,
   StyleSheet
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -12,21 +15,10 @@ import { COLORS, FONT_SIZES, SPACING } from '../../theme';
 
 export default function Carrito() {
   const router = useRouter();
-  const { carrito } = useCarrito();
+  const { carrito, notes, setNotes } = useCarrito();
   const hasItems = carrito.length > 0;
 
-  // Generar orden y mesa solo una vez:
-  const orderId = useMemo(
-    () => Math.floor(1000 + Math.random() * 9000),
-    []
-  );
-  const table = 5;
-
-  // Calcular subtotal
-  const subtotal = carrito.reduce(
-    (sum, i) => sum + i.price * i.quantity,
-    0
-  );
+  const subtotal = carrito.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
   return (
     <View style={styles.container}>
@@ -34,10 +26,6 @@ export default function Carrito() {
 
       {hasItems ? (
         <>
-          <Text style={styles.subtitle}>
-            Orden #{orderId} — Mesa {table}
-          </Text>
-
           <ScrollView style={styles.list}>
             {carrito.map((item: CartItem, idx) => (
               <View key={idx} style={styles.row}>
@@ -50,6 +38,15 @@ export default function Carrito() {
               </View>
             ))}
           </ScrollView>
+
+          <Text style={styles.subheader}>Notas</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Sin hielo / Alergia a X…"
+            multiline
+            value={notes}
+            onChangeText={setNotes}
+          />
 
           <View style={styles.pricing}>
             <Text>Subtotal</Text>
@@ -80,17 +77,25 @@ export default function Carrito() {
 
 const styles = StyleSheet.create({
   container:   { flex: 1, padding: SPACING.md, backgroundColor: COLORS.white },
-  header:      { fontSize: FONT_SIZES.subtitle, fontWeight: 'bold' },
-  subtitle:    { fontSize: FONT_SIZES.body, color: COLORS.grayDark, marginBottom: SPACING.sm },
+  header:      { fontSize: FONT_SIZES.subtitle, fontWeight: 'bold', marginBottom: SPACING.sm },
   list:        { flex: 1, marginBottom: SPACING.md },
   row:         {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    paddingVertical: SPACING.xs,
     borderBottomWidth: 1,
     borderColor: COLORS.grayLight,
-    paddingVertical: SPACING.xs,
   },
   itemText:    { fontSize: FONT_SIZES.body },
+  subheader:   { fontSize: FONT_SIZES.body, fontWeight: 'bold', marginTop: SPACING.md },
+  input:       {
+    borderWidth: 1,
+    borderColor: COLORS.grayLight,
+    borderRadius: 6,
+    padding: SPACING.sm,
+    minHeight: 60,
+    marginBottom: SPACING.md,
+  },
   pricing:     {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -110,7 +115,7 @@ const styles = StyleSheet.create({
   emptyText:   {
     textAlign: 'center',
     color: COLORS.grayDark,
-    padding: SPACING.md,
+    marginTop: SPACING.lg,
   },
   emptyButton: {
     backgroundColor: COLORS.grayLight,
