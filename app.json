@@ -2,7 +2,7 @@
   "expo": {
     "name": "Shoku",
     "extra": {
-      "API_URL" : "process.env.API_URL"
+      "API_URL" : "http://127.0.0.1:8000"
     },
     "slug": "Shoku",
     "version": "1.0.0",
