@@ -1,6 +1,9 @@
 {
   "expo": {
     "name": "Shoku",
+    "extra": {
+      "API_URL" : "process.env.API_URL"
+    },
     "slug": "Shoku",
     "version": "1.0.0",
     "orientation": "portrait",
