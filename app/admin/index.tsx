@@ -5,9 +5,11 @@ import Icon from '../../components/ui/Icon'; // Asegúrate de que la ruta sea co
 import { Config } from '../../constants/config'; // Asegúrate de que la ruta sea correcta
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
+import { useNavigation } from '@react-navigation/native';
 
 const LoginScreen = () => {
   const router = useRouter();
+  
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
 
@@ -45,8 +47,7 @@ const LoginScreen = () => {
 
       console.log('Login exitoso, UID:', loginData.uid);
       router.push({
-        pathname: '/admin/add-restaurant',
-        params: { userId: loginData.uid }, // Pasamos el UID como parámetro
+        pathname: '/admin/add-restaurant'
       });
 
       // 2. Luego obtenemos los datos del usuario usando el UID
@@ -60,7 +61,7 @@ const LoginScreen = () => {
       const userData = await userResponse.json();
       const userInfo = userData[loginData.uid]; // Extraemos los datos del objeto
 
-      console.log('Datos del usuario:', userInfo);
+      console.log('Datos del usuario:', userInfo); 
 
       // Guardamos los datos importantes
       await AsyncStorage.multiSet([
