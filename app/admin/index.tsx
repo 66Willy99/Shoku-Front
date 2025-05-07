@@ -4,19 +4,23 @@ import { Colors } from '../../constants/Colors'; // Asegúrate de que la ruta se
 import Icon from '../../components/ui/Icon'; // Asegúrate de que la ruta sea correcta
 import { Config } from '../../constants/config'; // Asegúrate de que la ruta sea correcta
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
 
-const LoginScreen = ({ navigation }: { navigation: any }) => {
+const LoginScreen = () => {
+  const router = useRouter();
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
       Alert.alert('Error', 'Por favor, completa todos los campos');
+      console.log('Error', 'Por favor, completa todos los campos')
       return;
     }
 
     if (!/^\S+@\S+\.\S+$/.test(email)) {
       Alert.alert('Error', 'Ingresa un correo electrónico válido');
+      console.log('Error', 'Ingresa un correo electrónico válido')
       return;
     }
 
@@ -40,6 +44,10 @@ const LoginScreen = ({ navigation }: { navigation: any }) => {
       }
 
       console.log('Login exitoso, UID:', loginData.uid);
+      router.push({
+        pathname: '/admin/add-restaurant',
+        params: { userId: loginData.uid }, // Pasamos el UID como parámetro
+      });
 
       // 2. Luego obtenemos los datos del usuario usando el UID
       const userResponse = await fetch(`${Config.API_URL}/user?userId=${loginData.uid}`);
