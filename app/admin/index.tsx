@@ -2,23 +2,75 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Colors } from '../../constants/Colors'; // Asegúrate de que la ruta sea correcta
 import Icon from '../../components/ui/Icon'; // Asegúrate de que la ruta sea correcta
+import { Config } from '../../constants/config'; // Asegúrate de que la ruta sea correcta
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const LoginScreen = ({ navigation }: { navigation: any }) => {
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
       Alert.alert('Error', 'Por favor, completa todos los campos');
       return;
     }
-    // Validación básica de email (opcional)
+
     if (!/^\S+@\S+\.\S+$/.test(email)) {
       Alert.alert('Error', 'Ingresa un correo electrónico válido');
       return;
     }
-    Alert.alert('Éxito', 'Inicio de sesión exitoso');
-    navigation.navigate('Home'); // Redirige a Home después del login
+
+    try {
+      // 1. Primero hacemos login para obtener el UID
+      const loginResponse = await fetch(`${Config.API_URL}/user/auth`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email.trim(),
+          password: password.trim(),
+        }),
+      });
+
+      const loginData = await loginResponse.json();
+
+      if (!loginResponse.ok) {
+        throw new Error(loginData.detail || 'Error en el inicio de sesión');
+      }
+
+      console.log('Login exitoso, UID:', loginData.uid);
+
+      // 2. Luego obtenemos los datos del usuario usando el UID
+      const userResponse = await fetch(`${Config.API_URL}/user?userId=${loginData.uid}`);
+      
+      if (!userResponse.ok) {
+        const errorData = await userResponse.json();
+        throw new Error(errorData.detail || 'Error al obtener datos del usuario');
+      }
+
+      const userData = await userResponse.json();
+      const userInfo = userData[loginData.uid]; // Extraemos los datos del objeto
+
+      console.log('Datos del usuario:', userInfo);
+
+      // Guardamos los datos importantes
+      await AsyncStorage.multiSet([
+        ['authToken', loginData.token || ''], // Si tu API devuelve un token
+        ['userId', loginData.uid],
+        ['userData', JSON.stringify(userInfo)]
+      ]);
+
+      // Redirigimos según el nivel de suscripción
+      
+
+    } catch (error: any) {
+      console.error('Error completo:', error);
+      Alert.alert(
+        'Error', 
+        error.message || 'Ocurrió un error durante el proceso'
+      );
+    }
   };
 
   return (
