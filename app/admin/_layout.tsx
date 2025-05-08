@@ -36,7 +36,7 @@ export default function AdminLayout() {
     }
     if (isAuthenticated && isOnLoginPage) {
         console.log('autenticado');
-        return <Redirect href="/admin/reports" />;
+        return <Redirect href="/admin/add-restaurant" />;
     }
 
     return (

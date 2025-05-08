@@ -6,6 +6,7 @@ import BoldText from '@/components/ui/CustomText';
 import React from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Config } from '../../constants/config';
+import { useRouter } from 'expo-router';
 
 export default function AdminScreen() {
     if (Platform.OS !== 'web') {
@@ -17,6 +18,8 @@ export default function AdminScreen() {
         direccion: '',
         telefono: ''
     });
+    const router = useRouter();
+    
     
     const handleSubmit = async () => {
         try	{
@@ -44,6 +47,9 @@ export default function AdminScreen() {
                     nombre: '',
                     direccion: '',
                     telefono: ''
+                });
+                router.push({
+                    pathname: '/admin/reports'
                 });
             });
         } catch (error) {
