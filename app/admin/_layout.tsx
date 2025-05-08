@@ -34,6 +34,10 @@ export default function AdminLayout() {
         console.log('No autenticado, redirigiendo a /admin');
         return <Redirect href="/admin" />;
     }
+    if (isAuthenticated && isOnLoginPage) {
+        console.log('autenticado');
+        return <Redirect href="/admin/reports" />;
+    }
 
     return (
         <View style={{ flex: 1, backgroundColor: '#eee9e5' }}>
