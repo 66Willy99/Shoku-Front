@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, ScrollView, StyleSheet, Platform } from "react-native";
 import { Redirect } from "expo-router";
 import "../../global.css";
+import { Colors } from "@/constants/Colors"; // Asegúrate de que la ruta sea correcta
 
 export default function AdminScreen() {
     if (Platform.OS !== "web") {
@@ -12,6 +13,10 @@ export default function AdminScreen() {
         { name: "Pedro Roa", orders: "11", avg_time: "8" },
         { name: "Luis Lopez", orders: "8", avg_time: "10" },
         { name: "Diego Lara", orders: "6", avg_time: "11" },
+        { name: "María González", orders: "14", avg_time: "7" },
+        { name: "Carlos Mendoza", orders: "9", avg_time: "9" },
+        { name: "Ana Torres", orders: "12", avg_time: "6" },
+        { name: "Javier Ruiz", orders: "7", avg_time: "12" },
     ];
 
     const data2 = [
@@ -31,27 +36,25 @@ export default function AdminScreen() {
 
     const ScrollableWorkesTable: React.FC<{ data: DataWorkers[] }> = ({ data }) => {
         return (
-            <View style={styles.workersTableOuterContainer}>
-                <ScrollView horizontal={true} style={styles.workersTableContainer}>
-                    <View style={styles.workersTableInnerContainer}>
+                <View className="flex-1 col-span-2 rounded-md">
+                    <Text className="text-center" style={{ color: Colors.coffee, fontSize: 24 }}> Desempeño del Personal</Text>
+                    <View className="bg-gray-200 m-2 p-2 rounded-md grid grid-cols-1 gap-4" style={{ backgroundColor: Colors.primary}}>
                         {/* Encabezados */}
-                        <View style={styles.workersHeaderRow}>
-                            <Text style={styles.workersHeaderCell}>Nombre</Text>
-                            <Text style={styles.workersHeaderCell}>Pedidos Entregados</Text>
-                            <Text style={styles.workersHeaderCell}>Tiempo Promedio</Text>
+                        <View className="grid grid-cols-3">
+                            <Text style={{ color: Colors.bg_light, fontWeight: "700" }}>Nombre</Text>
+                            <Text style={{ color: Colors.bg_light, fontWeight: "700" }}>Pedidos Entregados</Text>
+                            <Text style={{ color: Colors.bg_light, fontWeight: "700" }}>Tiempo Promedio</Text>
                         </View>
-    
-                        {/* Filas */}
+                        
                         {data.map((item, index) => (
-                            <View key={index} style={styles.workersRow}>
-                                <Text style={styles.workersCell}>{item.name}</Text>
-                                <Text style={styles.workersCell}>{item.orders}</Text>
-                                <Text style={styles.workersCell}>{item.avg_time} min</Text>
+                            <View key={index} className="grid grid-cols-3">
+                                <Text style={{ color: Colors.bg_light }}>{item.name}</Text>
+                                <Text style={{ color: Colors.bg_light }}>{item.orders}</Text>
+                                <Text style={{ color: Colors.bg_light }}>{item.avg_time} min</Text>
                             </View>
                         ))}
                     </View>
-                </ScrollView>
-            </View>
+                </View>
         );
     };
 
@@ -59,188 +62,43 @@ export default function AdminScreen() {
         data: { name: string; value: string }[];
     }> = ({ data }) => {
         return (
-            <View style={styles.diaryTableOuterContainer}>
-                <View style={styles.diaryTableContainer}>
+                <View className="grid grid-cols-3 gap-4 col-span-2">
                     {data.map((item, index) => (
-                        <View key={index} style={styles.diaryTableCell}>
-                            <Text style={styles.diaryTableValue}>{item.value}</Text>
-                            <Text style={styles.diaryTableName}>{item.name}</Text>
+                        <View key={index} className="bg-gray-200 p-2 rounded-md place-content-center" style={{ backgroundColor: Colors.primary }}>
+                            <Text style={{ color: Colors.bg_light }} className="text-center">{item.value}</Text>
+                            <Text style={{ color: Colors.bg_light }} className="text-center">{item.name}</Text>
                         </View>
                     ))}
                 </View>
-            </View>
         );
     };
 
     return (
-        <View style={styles.container}>
-            <Text style={styles.title}> Reportes de NombreRestaurante</Text>
+        <View className="flex-1 bg-white p-4 gap-5">
+            <Text className="text-center col-span-3"> Reportes de NombreRestaurante</Text>
             
             {/* Primera fila */}
-            <View style={styles.rowContainer}>
-                <View style={[styles.twoThirds, styles.content]}>
-                    <ScrollableDiaryTable data={data2} />
-                </View>
-                <View style={[styles.oneThird, styles.content]}>
-                    <Text> Pedidos Completados por hora</Text>
-                    <Text> 29 </Text>
+            <View className="grid grid-cols-3 gap-4 col-span-3" >
+                    <ScrollableDiaryTable data={data2}/>
+                <View className="bg-gray-200 p-2 rounded-md place-content-center">
+                    <Text className="text-center"> Pedidos Completados por hora</Text>
+                    <Text className="text-center"> 29 </Text>
                 </View>
             </View>
             
             {/* Segunda fila */}
-            <View style={styles.rowContainer}>
-                <View style={[styles.twoThirds, styles.content]}>
-                    <Text> Trabajadores</Text>
+            <View className="grid grid-cols-3 gap-4 col-span-3" >
                     <ScrollableWorkesTable data={data} />
-                </View>
-                <View style={[styles.oneThird, styles.content]}>
-                    <Text> Ventas por dia de la semana</Text>
-                </View>
+                    <View className="bg-gray-200 p-2 rounded-md place-content-center">
+                        <Text className="text-center"> Ventas por dia de la semana</Text>
+                        
+                    </View>
             </View>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        display: "flex",
-        flexDirection: "column",
-        flex: 1,
-        padding: 20,
-        backgroundColor: "#f5f5f5",
-    },
-    rowContainer: {
-        flexDirection: "row",
-        flex: 1,
-        marginBottom: 10,
-    },
-    twoThirds: {
-        flex: 2,
-    },
-    oneThird: {
-        flex: 1,
-    },
-    content: {
-        backgroundColor: "#a68",
-        padding: 10,
-        margin: 15,
-    },
-    title: {
-        fontSize: 24,
-        fontWeight: "bold",
-        marginBottom: 20,
-        textAlign: "center",
-        color: "#333",
-    },
-    tableContainer: {
-        marginTop: 10,
-        borderWidth: 1,
-        borderColor: "#ddd",
-        borderRadius: 5,
-        backgroundColor: "white",
-    },
-    headerRow: {
-        flexDirection: "row",
-        backgroundColor: "#6200ee",
-        padding: 10,
-    },
-    row: {
-        flexDirection: "row",
-        padding: 10,
-        borderBottomWidth: 1,
-        borderColor: "#ddd",
-    },
-    headerCell: {
-        color: "white",
-        fontWeight: "bold",
-    },
-    cell: {
-        color: "#333",
-    },
-    workersTableOuterContainer: {
-        flex: 1,
-        width: '100%',
-    },
-    workersTableContainer: {
-        flex: 1,
-        borderRadius: 10,
-        backgroundColor: 'white',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3.84,
-        elevation: 5,
-    },
-    workersTableInnerContainer: {
-        minWidth: '100%', // Asegura que el contenido sea scrollable
-    },
-    workersHeaderRow: {
-        flexDirection: 'row',
-        backgroundColor: '#6200ee',
-        borderTopLeftRadius: 10,
-        borderTopRightRadius: 10,
-        paddingVertical: 15,
-    },
-    workersHeaderCell: {
-        flex: 1,
-        color: 'white',
-        fontWeight: 'bold',
-        textAlign: 'center',
-        minWidth: 150, // Ancho mínimo para cada columna
-        paddingHorizontal: 10,
-    },
-    workersRow: {
-        flexDirection: 'row',
-        paddingVertical: 15,
-        borderBottomWidth: 1,
-        borderColor: '#f0f0f0',
-    },
-    workersCell: {
-        flex: 1,
-        color: '#333',
-        textAlign: 'center',
-        minWidth: 150, // Mismo ancho que los headers
-        paddingHorizontal: 10,
-    },
-    diaryTableOuterContainer: {
-        flex: 1,  // Toma el espacio disponible del contenedor padre
-        width: '100%',
-    },
-    diaryTableContainer: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        width: '100%',
-        height: '100%',  // Toma el 100% del outer container
-        justifyContent: 'space-between',
-        alignContent: 'space-between',  // Distribuye el espacio entre filas
-    },
-    diaryTableCell: {
-        width: '32%',  // Para 3 columnas
-        height: '48%', // Para 2 filas (dejando 4% de espacio entre ellas)
-        backgroundColor: 'white',
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: '#ddd',
-        padding: 10,
-        justifyContent: 'space-between',  // Valor arriba, nombre abajo
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3.84,
-        elevation: 5,
-    },
-    diaryTableValue: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#333',
-        textAlign: 'center',
-        flex: 1,
-        textAlignVertical: 'center',
-    },
-    diaryTableName: {
-        fontSize: 14,
-        color: '#666',
-        textAlign: 'center',
-    },
+
+
 });
