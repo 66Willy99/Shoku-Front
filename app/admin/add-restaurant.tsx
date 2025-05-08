@@ -1,25 +1,55 @@
-import { Platform, View, Text, StyleSheet } from 'react-native';
+import { Platform, View, Text, StyleSheet, Button, Alert } from 'react-native';
 import { Redirect } from 'expo-router';
 import { Pressable, TextInput } from 'react-native-gesture-handler';
 import { Colors } from '../../constants/Colors';
 import BoldText from '@/components/ui/CustomText';
 import React from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Config } from '../../constants/config';
 
 export default function AdminScreen() {
     if (Platform.OS !== 'web') {
         return <Redirect href="/" />; 
     }
+
     const [formData, setFormData] = React.useState({
         nombre: '',
         direccion: '',
         telefono: ''
     });
     
-    const handleSubmit = () => {
-        console.log('Datos enviados:', formData);
-        // Lógica para guardar
+    const handleSubmit = async () => {
+        try	{
+            await AsyncStorage.getItem('userId').then(async (userId) => {
+
+                const nombre = formData.nombre.trim();
+                const direccion = formData.direccion.trim();    
+                const telefono = formData.telefono.trim();
+
+                if (!nombre || !direccion || !telefono) {
+                    console.log('Error', 'Por favor, completa todos los campos');
+                    return;
+                }
+
+                const addResponse = await fetch(`
+                    ${Config.API_URL}/user/restaurant/?user_id=${userId}&nombre=${nombre}&direccion=${direccion}&telefono=${telefono}` , {
+                    method: 'POST'},);   
+
+                if (!addResponse.ok) {
+                    const errorData = await addResponse.json();
+                    throw new Error(errorData.detail || 'Error al crear el restaurante');
+                }
+                console.log('Restaurante creado exitosamente');
+                setFormData({
+                    nombre: '',
+                    direccion: '',
+                    telefono: ''
+                });
+            });
+        } catch (error) {
+            console.error('Error al obtener el usuario logueado:', error);
+        }
     };
-    
 
     return (
         <View style={styles.container}>
@@ -43,7 +73,10 @@ export default function AdminScreen() {
                     placeholder='Teléfono' 
                     value={formData.telefono}
                     keyboardType="phone-pad"
-                    onChangeText={(text) => setFormData({...formData, telefono: text})} />
+                    onChangeText={(text) => {
+                        const onlyNums = text.replace(/[^0-9]/g, '');
+                        setFormData({ ...formData, telefono: onlyNums });
+                    }} />
             </View>
             <Pressable style={styles.button} onPress={handleSubmit}>
                 <BoldText style={styles.textButton}>Crear</BoldText>
