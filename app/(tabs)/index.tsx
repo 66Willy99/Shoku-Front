@@ -34,7 +34,6 @@ export default function Home() {
       >
         <Text style={styles.buttonText}>🔔 Llamar a Mesero</Text>
       </TouchableOpacity>
-
       {/* Pagar (deshabilitado si no hay productos) */}
       <TouchableOpacity
         onPress={() => router.push('/pago')}

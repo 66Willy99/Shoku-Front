@@ -3,16 +3,20 @@
 import React, { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { useFonts } from 'expo-font';
+import { useFonts, Baloo2_400Regular, Baloo2_700Bold } from '@expo-google-fonts/baloo-2';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
-
 import { MenuProvider } from '../context/MenuContext';
 import { FavoritesProvider } from '../context/FavoritesContext';
 import { OrdersProvider } from '../context/OrdersContext';
 import { CarritoProvider } from '../context/CarritoContext';
+import { StatusBar as RNStatusBar } from 'react-native';
+import { useEffect } from 'react';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import { CarritoProvider } from '../context/CarritoContext';
+import { AuthProvider } from '../context/authContext';
+
 
 SplashScreen.preventAutoHideAsync();
 
@@ -49,8 +53,14 @@ export default function RootLayout() {
       <FavoritesProvider>
         <OrdersProvider>
           <CarritoProvider>
-            <ThemeProvider value={DefaultTheme}>
-              <Stack>
+            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+                {/* Este maneja los colores principales de la barra*/}
+                <RNStatusBar 
+                barStyle="dark-content" 
+                backgroundColor="transparent" 
+                />
+              <Stack
+                screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                 <Stack.Screen name="+not-found" options={{ title: 'No encontrado' }} />
               </Stack>

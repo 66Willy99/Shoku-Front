@@ -1,6 +1,9 @@
 {
   "expo": {
     "name": "Shoku",
+    "extra": {
+      "API_URL" : "http://20.206.249.77:8000"
+    },
     "slug": "Shoku",
     "version": "1.0.0",
     "orientation": "portrait",
