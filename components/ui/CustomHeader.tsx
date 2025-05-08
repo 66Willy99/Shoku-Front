@@ -21,6 +21,9 @@ export default function CustomHeader({ excludeRoutes = [] }: { excludeRoutes?: s
                     <Link href="/admin/add-restaurant" style={styles.navLink}>
                         <Text>Añadir Restaurante</Text>
                     </Link>
+                    <Link href="/admin/restaurant" style={styles.navLink}>
+                        <Text>Restaurante</Text>
+                    </Link>
                 </View>
             </View>
         </SafeAreaView>
