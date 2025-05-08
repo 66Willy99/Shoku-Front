@@ -1,40 +1,66 @@
 // app/_layout.tsx
 
+import React, { useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
 import 'react-native-reanimated';
 
+import { MenuProvider } from '../context/MenuContext';
+import { FavoritesProvider } from '../context/FavoritesContext';
 import { OrdersProvider } from '../context/OrdersContext';
 import { CarritoProvider } from '../context/CarritoContext';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const [loaded] = useFonts({
+  const [fontsLoaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
 
-  useEffect(() => {
-    if (loaded) SplashScreen.hideAsync();
-  }, [loaded]);
+  const [mounted, setMounted] = useState(false);
+  const [ToastComponent, setToastComponent] = useState<React.ComponentType | null>(null);
 
-  if (!loaded) return null;
+  useEffect(() => {
+    setMounted(true);
+
+    if (Platform.OS !== 'web') {
+      // Carga dinámica de Toast solo en móvil
+      const T = require('react-native-toast-message').default;
+      setToastComponent(() => T);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (fontsLoaded) {
+      SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded]);
+
+  if (!fontsLoaded) {
+    return null;
+  }
 
   return (
-    <OrdersProvider>
-      <CarritoProvider>
-        <ThemeProvider value={DefaultTheme}>
-          <Stack>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="+not-found" options={{ title: 'No encontrado' }} />
-          </Stack>
-          <StatusBar style="auto" />
-        </ThemeProvider>
-      </CarritoProvider>
-    </OrdersProvider>
+    <MenuProvider>
+      <FavoritesProvider>
+        <OrdersProvider>
+          <CarritoProvider>
+            <ThemeProvider value={DefaultTheme}>
+              <Stack>
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="+not-found" options={{ title: 'No encontrado' }} />
+              </Stack>
+              <StatusBar style="auto" />
+              {/* Monta Toast solo en cliente móvil */}
+              {mounted && ToastComponent && <ToastComponent />}
+            </ThemeProvider>
+          </CarritoProvider>
+        </OrdersProvider>
+      </FavoritesProvider>
+    </MenuProvider>
   );
 }

@@ -1,5 +1,4 @@
 // app/(tabs)/estado.tsx
-
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -17,9 +16,8 @@ const STEPS = [
   { key: 'confirmed', icon: 'check-circle',           label: 'Pedido confirmado' },
   { key: 'preparing', icon: 'silverware-fork-knife',  label: 'En preparación' },
   { key: 'finished',  icon: 'clock-end',              label: 'Terminado' },
-  { key: 'delivered', icon: 'food-fork-drink',        label: 'Entregado' },  // icon de plato servido
+  { key: 'delivered', icon: 'food-fork-drink',        label: 'Entregado' },
 ];
-
 const STATUS_INDEX: Record<Order['status'], number> = {
   'en progreso': 1,
   'listo':       2,
@@ -29,9 +27,9 @@ const STATUS_INDEX: Record<Order['status'], number> = {
 export default function Estado() {
   const router = useRouter();
   const { orders } = useOrders();
-
-  // Para actualizar el tiempo restante cada segundo
   const [now, setNow] = useState(Date.now());
+
+  // actualizar cada segundo para cuenta regresiva
   useEffect(() => {
     const iv = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(iv);
@@ -49,6 +47,21 @@ export default function Estado() {
     return `${m}:${s}`;
   };
 
+  // si no hay pedidos activos ni historial:
+  if (orders.length === 0) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>Aún no tienes ningún pedido.</Text>
+        <TouchableOpacity
+          style={styles.btn}
+          onPress={() => router.push('/carta')}
+        >
+          <Text style={styles.btnText}>🛒 Ver Carta</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   const activos     = orders.filter(o => o.status !== 'completado');
   const completados = orders.filter(o => o.status === 'completado');
 
@@ -58,24 +71,26 @@ export default function Estado() {
         const idx = STATUS_INDEX[o.status];
         return (
           <View key={o.id} style={styles.section}>
+            {/* Cabecera de datos */}
             <Text style={styles.sectionTitle}>Datos de tu pedido</Text>
             <View style={styles.infoRow}>
-              <MaterialCommunityIcons name="receipt" size={20} color={COLORS.white} />
+              <MaterialCommunityIcons name="receipt" size={20} color="#fff" />
               <Text style={styles.infoText}>Orden #{o.id}</Text>
             </View>
             <View style={styles.infoRow}>
-              <MaterialCommunityIcons name="currency-usd" size={20} color={COLORS.white} />
+              <MaterialCommunityIcons name="currency-usd" size={20} color="#fff" />
               <Text style={styles.infoText}>
-                Total: ${o.items.reduce((s, i) => s + i.price * i.quantity, 0).toLocaleString()}
+                Total: ${o.items.reduce((s,i)=>s+i.price*i.quantity,0).toLocaleString()}
               </Text>
             </View>
             <View style={styles.infoRow}>
-              <MaterialCommunityIcons name="timer" size={20} color={COLORS.white} />
+              <MaterialCommunityIcons name="timer" size={20} color="#fff" />
               <Text style={styles.infoText}>
-                Tiempo estimado: {o.estimatedTime} minutos
+                Estimado: {o.estimatedTime} min
               </Text>
             </View>
 
+            {/* Línea de tiempo */}
             <View style={styles.timelineCard}>
               {STEPS.map((step, i) => {
                 const isActive = i <= idx;
@@ -103,10 +118,10 @@ export default function Estado() {
                       ]}
                     >
                       {step.label}
-                      {i === 0 && ` — ${formatTime(o.timestamp)}`}
                       {i === idx && o.status === 'en progreso'
-                        ? ` (resta ${remaining(o)})`
+                        ? ` — Resta ${remaining(o)}`
                         : ''}
+                      {i === 0 && ` (${formatTime(o.timestamp)})`}
                     </Text>
                   </View>
                 );
@@ -141,24 +156,25 @@ export default function Estado() {
           })}
         </>
       )}
-
-      <TouchableOpacity
-        style={styles.backButton}
-        onPress={() => router.push('/')}
-      >
-        <Text style={styles.backText}>← Volver al inicio</Text>
-      </TouchableOpacity>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container:    { flexGrow: 1, padding: SPACING.md, backgroundColor: COLORS.background },
+  emptyContainer: {
+    flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background,
+    padding: SPACING.md
+  },
+  emptyText: { fontSize: FONT_SIZES.body, color: COLORS.grayDark, marginBottom: SPACING.md },
+  btn:        { backgroundColor: COLORS.primary, padding: SPACING.md, borderRadius: 8 },
+  btnText:    { color: '#fff', fontWeight: 'bold' },
+
+  container:    { padding: SPACING.md, backgroundColor: COLORS.background },
   section:      { marginBottom: SPACING.lg },
   sectionTitle: {
     fontSize: FONT_SIZES.subtitle,
     fontWeight: 'bold',
-    color: COLORS.white,
+    color: '#fff',
     backgroundColor: COLORS.primary,
     padding: SPACING.md,
     borderRadius: 8,
@@ -173,14 +189,9 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     marginBottom: SPACING.xs,
   },
-  infoText:     { color: COLORS.white, marginLeft: SPACING.xs },
+  infoText:     { color: '#fff', marginLeft: SPACING.xs },
 
-  timelineCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: SPACING.md,
-    marginVertical: SPACING.sm,
-  },
+  timelineCard: { backgroundColor: COLORS.white, borderRadius: 12, padding: SPACING.md, marginVertical: SPACING.sm },
   stepContainer:{ flexDirection: 'row', alignItems: 'center', marginVertical: SPACING.xs },
   iconColumn:   { alignItems: 'center', marginRight: SPACING.sm },
   line:         { width: 2, flex: 1, marginTop: SPACING.xs },
@@ -190,13 +201,4 @@ const styles = StyleSheet.create({
 
   historyCard:  { backgroundColor: COLORS.white, padding: SPACING.sm, borderRadius: 8, marginBottom: SPACING.sm },
   historyTitle: { fontWeight: 'bold', marginBottom: SPACING.xs },
-
-  backButton:   {
-    marginTop: SPACING.lg,
-    padding: SPACING.sm,
-    backgroundColor: COLORS.primary,
-    borderRadius: 6,
-    alignItems: 'center',
-  },
-  backText:     { color: COLORS.white, fontSize: FONT_SIZES.body },
 });

@@ -1,3 +1,4 @@
+// app/(tabs)/pago.tsx
 import React, { useState } from 'react';
 import {
   View,
@@ -50,20 +51,17 @@ export default function Pago() {
       return;
     }
 
-    // Registramos el pedido
     addOrder(carrito, notes, method === 'efectivo', estimatedTime);
 
     if (method === 'efectivo') {
       showWaiter();
     } else if (method === 'tarjeta') {
-      // Abre WebPay
       Linking.openURL('https://tu-webpay-sandbox.example.com/checkout')
         .catch(() => Alert.alert('Error', 'No se pudo abrir WebPay'));
       limpiarCarrito();
       router.replace('/estado');
-    } else if (method === 'qr') {
+    } else {
       Alert.alert('Escaneo QR', 'Abriendo cámara para código QR…');
-      // aquí meterías tu lógica de cámara
       limpiarCarrito();
       router.replace('/estado');
     }
@@ -179,9 +177,8 @@ const styles = StyleSheet.create({
   payText:      { color: COLORS.white, fontSize: FONT_SIZES.body, fontWeight: 'bold' },
   emptyText:    { textAlign: 'center', color: COLORS.grayDark, marginTop: SPACING.lg },
 
-  /* Modal mesero */
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
-  modalBox:     { backgroundColor: COLORS.white, padding: SPACING.lg, borderRadius: 12, alignItems: 'center', width: '80%' },
-  modalTitle:   { fontSize: FONT_SIZES.subtitle, fontWeight: 'bold', marginBottom: SPACING.sm },
-  modalMsg:     { fontSize: FONT_SIZES.body, color: COLORS.grayDark },
+  modalOverlay:{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
+  modalBox:    { backgroundColor: COLORS.white, padding: SPACING.lg, borderRadius: 12, alignItems: 'center', width: '80%' },
+  modalTitle:  { fontSize: FONT_SIZES.subtitle, fontWeight: 'bold', marginBottom: SPACING.sm },
+  modalMsg:    { fontSize: FONT_SIZES.body, color: COLORS.grayDark },
 });

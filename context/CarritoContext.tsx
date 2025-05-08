@@ -1,57 +1,52 @@
 // context/CarritoContext.tsx
 
-import React, {
-  createContext,
-  useContext,
-  useState,
-  ReactNode
-} from 'react';
+import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { useMenu, Dish } from './MenuContext';  // importamos useMenu y el tipo Dish
 
-export interface CartItem {
-  name:     string;
-  price:    number;
+export type CartItem = {
+  name: string;
+  price: number;
   quantity: number;
-}
-
-interface CarritoContextType {
-  carrito:     CartItem[];
-  notes:       string;
-  setNotes:    (n: string) => void;
-  agregarProducto: (name: string) => void;
-  limpiarCarrito:  () => void;
-}
-
-const PRICE_LIST: Record<string, number> = {
-  'Pasta Boloñesa': 8990,
-  'Pasta Carbonara': 7990,
-  Lasaña: 9500,
-  Canelones: 9200,
-  'Sándwich mixto': 4990,
-  'Sándwich vegetal': 4490,
-  'Bocadillo de jamón': 3990,
-  'Bocadillo de tortilla': 3790,
-  'Ensalada César': 5500,
-  'Ensalada de Quesos': 6000,
-  'Ensalada Mixta': 5200,
-  'Ensalada de Verano': 5800,
 };
 
-const CarritoContext = createContext<CarritoContextType | null>(null);
+type CarritoContextType = {
+  carrito: CartItem[];
+  notes: string;
+  setNotes: (text: string) => void;
+  agregarProducto: (name: string) => void;
+  removeProducto: (name: string) => void;
+  limpiarCarrito: () => void;
+};
 
-export const CarritoProvider = ({ children }: { children: ReactNode }) => {
+const CarritoContext = createContext<CarritoContextType | undefined>(undefined);
+
+export const CarritoProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const menu = useMenu();
+  const allDishes: Dish[] = Object.values(menu).flat();
+
   const [carrito, setCarrito] = useState<CartItem[]>([]);
-  const [notes, setNotes]     = useState<string>('');
+  const [notes, setNotes]      = useState<string>('');
 
   const agregarProducto = (name: string) => {
+    // Buscamos el plato en el menú para tomar su precio
+    const dish = allDishes.find(d => d.name === name);
+    if (!dish) return;
+
     setCarrito(prev => {
       const idx = prev.findIndex(i => i.name === name);
       if (idx >= 0) {
+        // Si ya existe, aumentamos cantidad
         const copy = [...prev];
         copy[idx].quantity += 1;
         return copy;
       }
-      return [...prev, { name, price: PRICE_LIST[name] ?? 0, quantity: 1 }];
+      // Si no existe, agregamos nuevo con cantidad 1
+      return [...prev, { name, price: dish.price, quantity: 1 }];
     });
+  };
+
+  const removeProducto = (name: string) => {
+    setCarrito(prev => prev.filter(i => i.name !== name));
   };
 
   const limpiarCarrito = () => {
@@ -61,7 +56,7 @@ export const CarritoProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <CarritoContext.Provider
-      value={{ carrito, notes, setNotes, agregarProducto, limpiarCarrito }}
+      value={{ carrito, notes, setNotes, agregarProducto, removeProducto, limpiarCarrito }}
     >
       {children}
     </CarritoContext.Provider>

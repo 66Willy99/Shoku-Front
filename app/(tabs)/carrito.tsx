@@ -1,5 +1,4 @@
 // app/(tabs)/carrito.tsx
-
 import React from 'react';
 import {
   View,
@@ -7,7 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  StyleSheet
+  StyleSheet,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useCarrito, CartItem } from '../../context/CarritoContext';
@@ -15,9 +14,8 @@ import { COLORS, FONT_SIZES, SPACING } from '../../theme';
 
 export default function Carrito() {
   const router = useRouter();
-  const { carrito, notes, setNotes } = useCarrito();
+  const { carrito, notes, setNotes, removeProducto } = useCarrito();
   const hasItems = carrito.length > 0;
-
   const subtotal = carrito.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
   return (
@@ -29,12 +27,20 @@ export default function Carrito() {
           <ScrollView style={styles.list}>
             {carrito.map((item: CartItem, idx) => (
               <View key={idx} style={styles.row}>
-                <Text style={styles.itemText}>
-                  {item.name} ×{item.quantity}
-                </Text>
-                <Text style={styles.itemText}>
-                  ${(item.price * item.quantity).toLocaleString()}
-                </Text>
+                <View>
+                  <Text style={styles.itemText}>
+                    {item.name} × {item.quantity}
+                  </Text>
+                  <Text style={styles.itemText}>
+                    ${ (item.price * item.quantity).toLocaleString() }
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.deleteBtn}
+                  onPress={() => removeProducto(item.name)}
+                >
+                  <Text style={styles.deleteText}>Eliminar</Text>
+                </TouchableOpacity>
               </View>
             ))}
           </ScrollView>
@@ -42,7 +48,7 @@ export default function Carrito() {
           <Text style={styles.subheader}>Notas</Text>
           <TextInput
             style={styles.input}
-            placeholder="Sin hielo / Alergia a X…"
+            placeholder="Sin hielo / Alergia a…"
             multiline
             value={notes}
             onChangeText={setNotes}
@@ -67,7 +73,7 @@ export default function Carrito() {
             style={styles.emptyButton}
             onPress={() => router.push('/carta')}
           >
-            <Text style={styles.emptyText}>🛒 Ir a la Carta</Text>
+            <Text style={styles.emptyText}>🛒 Ver Carta</Text>
           </TouchableOpacity>
         </>
       )}
@@ -82,11 +88,14 @@ const styles = StyleSheet.create({
   row:         {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     paddingVertical: SPACING.xs,
     borderBottomWidth: 1,
     borderColor: COLORS.grayLight,
   },
   itemText:    { fontSize: FONT_SIZES.body },
+  deleteBtn:   { padding: SPACING.xs },
+  deleteText:  { color: COLORS.secondary, fontSize: FONT_SIZES.body },
   subheader:   { fontSize: FONT_SIZES.body, fontWeight: 'bold', marginTop: SPACING.md },
   input:       {
     borderWidth: 1,
@@ -107,16 +116,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
   },
-  nextText:    {
-    color: COLORS.white,
-    fontSize: FONT_SIZES.body,
-    fontWeight: 'bold',
-  },
-  emptyText:   {
-    textAlign: 'center',
-    color: COLORS.grayDark,
-    marginTop: SPACING.lg,
-  },
+  nextText:    { color: COLORS.white, fontSize: FONT_SIZES.body, fontWeight: 'bold' },
+  emptyText:   { textAlign: 'center', color: COLORS.grayDark, marginTop: SPACING.lg },
   emptyButton: {
     backgroundColor: COLORS.grayLight,
     padding: SPACING.md,

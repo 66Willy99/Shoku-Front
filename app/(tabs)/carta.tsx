@@ -1,165 +1,256 @@
-import React, { useState } from 'react';
+// app/(tabs)/carta.tsx
+
+import React, { useRef, useEffect, useState } from 'react';
 import {
+  ScrollView,
   View,
   Text,
-  ScrollView,
+  Image,
   TouchableOpacity,
-  StyleSheet
+  StyleSheet,
+  Dimensions,
+  Animated,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useMenu } from '../../context/MenuContext';
+import { useFavorites } from '../../context/FavoritesContext';
 import { useCarrito } from '../../context/CarritoContext';
+import { dishImages } from '../../assets/images';
 import { COLORS, FONT_SIZES, SPACING } from '../../theme';
 
-const DATA = {
-  Pastas: [
-    'Pasta Boloñesa',
-    'Pasta Carbonara',
-    'Lasaña',
-    'Canelones'
-  ],
-  Bocadillos: [
-    'Sándwich mixto',
-    'Sándwich vegetal',
-    'Bocadillo de jamón',
-    'Bocadillo de tortilla'
-  ],
-  Ensaladas: [
-    'Ensalada César',
-    'Ensalada de Quesos',
-    'Ensalada Mixta',
-    'Ensalada de Verano'
-  ],
-} as const;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const H_PAD  = SPACING.md;
+const GAP    = SPACING.sm;
+// Dos columnas en móvil
+const CARD_W = (SCREEN_WIDTH - H_PAD * 2 - GAP) / 2;
 
-const PRICE_LIST: Record<string, number> = {
-  'Pasta Boloñesa': 8990,
-  'Pasta Carbonara': 7990,
-  Lasaña: 9500,
-  Canelones: 9200,
-  'Sándwich mixto': 4990,
-  'Sándwich vegetal': 4490,
-  'Bocadillo de jamón': 3990,
-  'Bocadillo de tortilla': 3790,
-  'Ensalada César': 5500,
-  'Ensalada de Quesos': 6000,
-  'Ensalada Mixta': 5200,
-  'Ensalada de Verano': 5800,
-};
+type Dish = { name: string; price: number };
 
-type Category = keyof typeof DATA;
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 export default function Carta() {
-  const router = useRouter();
-  const { carrito, agregarProducto } = useCarrito();
-  const categorias = Object.keys(DATA) as Category[];
-  const [sel, setSel] = useState<Category>(categorias[0]);
+  const menu        = useMenu();
+  const allDishes   = Object.values(menu).flat() as Dish[];
+  const recommended = allDishes.slice(0, 6);
 
-  const hasItems = carrito.length > 0;
+  // Carousel auto-scroll
+  const carouselRef = useRef<ScrollView>(null);
+  let idx = 0;
+  useEffect(() => {
+    if (recommended.length < 2) return;
+    const iv = setInterval(() => {
+      idx = (idx + 1) % recommended.length;
+      carouselRef.current?.scrollTo({
+        x: idx * (CARD_W + GAP),
+        animated: true,
+      });
+    }, 3000);
+    return () => clearInterval(iv);
+  }, [recommended]);
 
   return (
-    <View style={styles.container}>
-      {/* Selector de categorías */}
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+    >
+      <Text style={styles.mainTitle}>CARTA</Text>
+
+      <Text style={styles.sectionTitle}>Recomendados</Text>
       <ScrollView
+        ref={carouselRef}
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={styles.catScroll}
+        snapToInterval={CARD_W + GAP}
+        decelerationRate="fast"
+        contentContainerStyle={styles.carouselContent}
       >
-        {categorias.map((c) => (
-          <TouchableOpacity
-            key={c}
-            onPress={() => setSel(c)}
+        {recommended.map((dish, i) => (
+          <View
+            key={dish.name}
             style={[
-              styles.catButton,
-              sel === c && { backgroundColor: COLORS.primary },
+              styles.carouselItem,
+              { marginRight: i < recommended.length - 1 ? GAP : 0 },
             ]}
           >
-            <Text
-              style={[
-                styles.catText,
-                sel === c && { color: COLORS.white },
-              ]}
-            >
-              {c.toUpperCase()}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {/* Lista de productos con precio */}
-      <ScrollView style={styles.list}>
-        {DATA[sel].map((producto) => (
-          <View key={producto} style={styles.productRow}>
-            <View>
-              <Text style={styles.productText}>{producto}</Text>
-              <Text style={styles.priceText}>
-                ${PRICE_LIST[producto].toLocaleString()}
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => agregarProducto(producto)}
-            >
-              <Text style={styles.addText}>+ Agregar</Text>
-            </TouchableOpacity>
+            <Card dish={dish} />
           </View>
         ))}
       </ScrollView>
 
-      {/* Ver Pedido o aviso si está vacío */}
-      {hasItems ? (
-        <TouchableOpacity
-          style={styles.cartButton}
-          onPress={() => router.push('/carrito')}
-        >
-          <Text style={styles.cartText}>🛒 Ver Pedido ({carrito.length})</Text>
-        </TouchableOpacity>
-      ) : (
-        <Text style={styles.emptyText}>Agrega productos para ver tu pedido</Text>
-      )}
+      <Text style={styles.sectionTitle}>Todos los platos</Text>
+      <View style={styles.grid}>
+        {allDishes.map((dish) => (
+          <View key={dish.name} style={styles.gridItem}>
+            <Card dish={dish} />
+          </View>
+        ))}
+      </View>
+    </ScrollView>
+  );
+}
+
+function Card({ dish }: { dish: Dish }) {
+  const { favorites, toggle } = useFavorites();
+  const { agregarProducto }   = useCarrito();
+  const isFav = favorites.includes(dish.name);
+
+  const scale = useRef(new Animated.Value(1)).current;
+  const [feedback, setFeedback] = useState('');
+  const fbOpacity              = useRef(new Animated.Value(0)).current;
+
+  const bump = () => {
+    Animated.sequence([
+      Animated.spring(scale, { toValue: 1.2, friction: 3, useNativeDriver: true }),
+      Animated.spring(scale, { toValue: 1,   friction: 3, useNativeDriver: true }),
+    ]).start();
+  };
+  const showFeedback = (msg: string) => {
+    setFeedback(msg);
+    Animated.sequence([
+      Animated.timing(fbOpacity, { toValue: 1, duration: 150, useNativeDriver: true }),
+      Animated.delay(600),
+      Animated.timing(fbOpacity, { toValue: 0, duration: 150, useNativeDriver: true }),
+    ]).start();
+  };
+
+  const onAdd = () => {
+    bump();
+    agregarProducto(dish.name);   // ← ahora pasamos el nombre
+    showFeedback('¡Agregado!');
+  };
+  const onFav = () => {
+    bump();
+    toggle(dish.name);
+    showFeedback(isFav ? 'Quitado' : 'Favorito');
+  };
+
+  return (
+    <View style={styles.card}>
+      <Image source={dishImages[dish.name]} style={styles.image} />
+      <View style={styles.info}>
+        <Text style={styles.name}>{dish.name}</Text>
+        <Text style={styles.price}>${dish.price.toLocaleString()}</Text>
+      </View>
+      <View style={styles.actions}>
+        <AnimatedTouchable onPress={onFav} style={{ transform: [{ scale }] }}>
+          <Text style={[styles.icon, isFav && { color: COLORS.secondary }]}>
+            {isFav ? '★' : '☆'}
+          </Text>
+        </AnimatedTouchable>
+        <AnimatedTouchable onPress={onAdd} style={[styles.addBtn, { transform: [{ scale }] }]}>
+          <Text style={styles.addText}>+ Agregar</Text>
+        </AnimatedTouchable>
+      </View>
+      <Animated.View style={[styles.feedback, { opacity: fbOpacity }]}>
+        <Text style={styles.feedbackText}>{feedback}</Text>
+      </Animated.View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container:  { flex: 1, backgroundColor: COLORS.white },
-  catScroll:  { backgroundColor: COLORS.grayLight, padding: SPACING.sm },
-  catButton:  {
-    marginRight: SPACING.sm,
-    paddingVertical: SPACING.xs,
-    paddingHorizontal: SPACING.md,
-    borderRadius: 20,
-    backgroundColor: COLORS.grayLight,
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
   },
-  catText:    { fontSize: FONT_SIZES.small, color: COLORS.grayDark },
-  list:       { flex: 1, padding: SPACING.md },
-  productRow: {
+  contentContainer: {
+    paddingHorizontal: H_PAD,
+    paddingTop: SPACING.lg,
+    paddingBottom: SPACING.xl,
+  },
+  mainTitle: {
+    fontSize: FONT_SIZES.title,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: SPACING.lg,
+  },
+  sectionTitle: {
+    fontSize: FONT_SIZES.subtitle,
+    fontWeight: '600',
+    marginTop: SPACING.md,
+    marginBottom: SPACING.sm,
+  },
+  carouselContent: {
+    paddingVertical: SPACING.sm,
+  },
+  carouselItem: {
+    width: CARD_W,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginTop: SPACING.sm,
+  },
+  gridItem: {
+    width: CARD_W,
+    marginBottom: SPACING.md,
+  },
+  card: {
+    backgroundColor: COLORS.white,
+    borderRadius: 8,
+    overflow: 'hidden',
+    // sombra iOS
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    // elevación Android
+    elevation: 2,
+  },
+  image: {
+    width: '100%',
+    height: CARD_W,
+  },
+  info: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING.sm,
+    padding: SPACING.sm,
   },
-  productText:{ fontSize: FONT_SIZES.body },
-  priceText:  { fontSize: FONT_SIZES.small, color: COLORS.grayDark },
-  addButton:  {
+  name: {
+    flex: 1,
+    fontSize: FONT_SIZES.body,
+    fontWeight: '600',
+  },
+  price: {
+    fontSize: FONT_SIZES.body,
+    fontWeight: '700',
+    color: COLORS.primary,
+    marginLeft: SPACING.xs,
+  },
+  actions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.sm,
+    paddingBottom: SPACING.sm,
+  },
+  icon: {
+    fontSize: 22,
+    color: COLORS.grayDark,
+  },
+  addBtn: {
     backgroundColor: COLORS.primary,
     paddingVertical: SPACING.xs,
     paddingHorizontal: SPACING.sm,
-    borderRadius: 6,
+    borderRadius: 4,
   },
-  addText:    { color: COLORS.white },
-  cartButton: {
-    backgroundColor: COLORS.primary,
-    padding: SPACING.md,
+  addText: {
+    color: COLORS.white,
+    fontWeight: '600',
+  },
+  feedback: {
+    position: 'absolute',
+    top: '45%',
+    left: 0,
+    right: 0,
     alignItems: 'center',
   },
-  cartText:   {
+  feedbackText: {
+    backgroundColor: COLORS.grayDark + '80',
     color: COLORS.white,
-    fontSize: FONT_SIZES.body,
-    fontWeight: 'bold',
-  },
-  emptyText:  {
-    textAlign: 'center',
-    color: COLORS.grayDark,
-    padding: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    borderRadius: 12,
+    fontWeight: '600',
   },
 });
