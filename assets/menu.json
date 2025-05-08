@@ -1,0 +1,11 @@
+{
+    "Pastas": [
+      { "name": "Pasta Boloñesa",  "price": 8990 },
+      { "name": "Pasta Carbonara", "price": 7990 }
+    ],
+    "Ensaladas": [
+      { "name": "Ensalada César",  "price": 5500 },
+      { "name": "Ensalada Mixta",  "price": 5200 }
+    ]
+  }
+  

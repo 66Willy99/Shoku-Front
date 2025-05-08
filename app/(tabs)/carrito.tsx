@@ -1,65 +1,127 @@
-import { View, Text, ScrollView, Pressable } from 'react-native';
-import { useCarrito } from '../../context/CarritoContext';
-import { Link, useRouter } from 'expo-router';
+// app/(tabs)/carrito.tsx
+import React from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  StyleSheet,
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import { useCarrito, CartItem } from '../../context/CarritoContext';
+import { COLORS, FONT_SIZES, SPACING } from '../../theme';
 
 export default function Carrito() {
-  const { carrito, limpiarCarrito } = useCarrito();
   const router = useRouter();
-
-  const total = carrito.length;
+  const { carrito, notes, setNotes, removeProducto } = useCarrito();
+  const hasItems = carrito.length > 0;
+  const subtotal = carrito.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
   return (
-    <ScrollView style={{ padding: 16, backgroundColor: '#fff' }}>
-      <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16 }}>🛒 Tu Carrito</Text>
+    <View style={styles.container}>
+      <Text style={styles.header}>Tu Pedido</Text>
 
-      {carrito.length === 0 ? (
-        <Text style={{ fontSize: 16 }}>Tu carrito está vacío.</Text>
-      ) : (
-        carrito.map((item, index) => (
-          <View
-            key={index}
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              marginBottom: 10,
-              borderBottomWidth: 1,
-              borderColor: '#ccc',
-              paddingBottom: 6,
-            }}
-          >
-            <Text>{item}</Text>
-            <Text>$X.XXX</Text>
-          </View>
-        ))
-      )}
-
-      {carrito.length > 0 && (
+      {hasItems ? (
         <>
-          <Text style={{ marginTop: 12, fontWeight: 'bold' }}>Total de productos: {total}</Text>
+          <ScrollView style={styles.list}>
+            {carrito.map((item: CartItem, idx) => (
+              <View key={idx} style={styles.row}>
+                <View>
+                  <Text style={styles.itemText}>
+                    {item.name} × {item.quantity}
+                  </Text>
+                  <Text style={styles.itemText}>
+                    ${ (item.price * item.quantity).toLocaleString() }
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.deleteBtn}
+                  onPress={() => removeProducto(item.name)}
+                >
+                  <Text style={styles.deleteText}>Eliminar</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </ScrollView>
 
-          <Link href={{ pathname: '/estado' }} asChild>
-            <Pressable
-              onPress={() => limpiarCarrito()}
-              style={{
-                marginTop: 20,
-                backgroundColor: '#10b981',
-                padding: 12,
-                borderRadius: 8,
-                alignItems: 'center',
-              }}
-            >
-              <Text style={{ color: '#fff', fontWeight: 'bold' }}>✅ Realizar Pedido</Text>
-            </Pressable>
-          </Link>
+          <Text style={styles.subheader}>Notas</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Sin hielo / Alergia a…"
+            multiline
+            value={notes}
+            onChangeText={setNotes}
+          />
+
+          <View style={styles.pricing}>
+            <Text>Subtotal</Text>
+            <Text>${subtotal.toLocaleString()}</Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.nextButton}
+            onPress={() => router.push('/pago')}
+          >
+            <Text style={styles.nextText}>✅ Continuar a Pagar</Text>
+          </TouchableOpacity>
+        </>
+      ) : (
+        <>
+          <Text style={styles.emptyText}>Tu carrito está vacío</Text>
+          <TouchableOpacity
+            style={styles.emptyButton}
+            onPress={() => router.push('/carta')}
+          >
+            <Text style={styles.emptyText}>🛒 Ver Carta</Text>
+          </TouchableOpacity>
         </>
       )}
-
-      <Pressable
-        onPress={() => router.back()}
-        style={{ marginTop: 32, alignItems: 'center' }}
-      >
-        <Text style={{ color: '#3b82f6' }}>← Volver a la carta</Text>
-      </Pressable>
-    </ScrollView>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container:   { flex: 1, padding: SPACING.md, backgroundColor: COLORS.white },
+  header:      { fontSize: FONT_SIZES.subtitle, fontWeight: 'bold', marginBottom: SPACING.sm },
+  list:        { flex: 1, marginBottom: SPACING.md },
+  row:         {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: SPACING.xs,
+    borderBottomWidth: 1,
+    borderColor: COLORS.grayLight,
+  },
+  itemText:    { fontSize: FONT_SIZES.body },
+  deleteBtn:   { padding: SPACING.xs },
+  deleteText:  { color: COLORS.secondary, fontSize: FONT_SIZES.body },
+  subheader:   { fontSize: FONT_SIZES.body, fontWeight: 'bold', marginTop: SPACING.md },
+  input:       {
+    borderWidth: 1,
+    borderColor: COLORS.grayLight,
+    borderRadius: 6,
+    padding: SPACING.sm,
+    minHeight: 60,
+    marginBottom: SPACING.md,
+  },
+  pricing:     {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.md,
+  },
+  nextButton:  {
+    backgroundColor: COLORS.secondary,
+    padding: SPACING.md,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  nextText:    { color: COLORS.white, fontSize: FONT_SIZES.body, fontWeight: 'bold' },
+  emptyText:   { textAlign: 'center', color: COLORS.grayDark, marginTop: SPACING.lg },
+  emptyButton: {
+    backgroundColor: COLORS.grayLight,
+    padding: SPACING.md,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+});
