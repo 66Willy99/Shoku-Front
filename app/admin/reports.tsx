@@ -75,7 +75,7 @@ export default function AdminScreen() {
 
     return (
         <View className="flex-1 bg-white p-4 gap-5">
-            <Text className="text-center col-span-3"> Reportes de NombreRestaurante</Text>
+            <Text className="text-center col-span-3"> Reportes </Text>
             
             {/* Primera fila */}
             <View className="grid grid-cols-3 gap-4 col-span-3" >

@@ -12,10 +12,9 @@ import { FavoritesProvider } from '../context/FavoritesContext';
 import { OrdersProvider } from '../context/OrdersContext';
 import { CarritoProvider } from '../context/CarritoContext';
 import { StatusBar as RNStatusBar } from 'react-native';
-import { useEffect } from 'react';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { CarritoProvider } from '../context/CarritoContext';
 import { AuthProvider } from '../context/authContext';
+import { StatusBar } from 'expo-status-bar';
 
 
 SplashScreen.preventAutoHideAsync();
@@ -24,6 +23,8 @@ export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
+
+  const colorScheme = useColorScheme();
 
   const [mounted, setMounted] = useState(false);
   const [ToastComponent, setToastComponent] = useState<React.ComponentType | null>(null);
@@ -49,28 +50,30 @@ export default function RootLayout() {
   }
 
   return (
-    <MenuProvider>
-      <FavoritesProvider>
-        <OrdersProvider>
-          <CarritoProvider>
-            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-                {/* Este maneja los colores principales de la barra*/}
-                <RNStatusBar 
-                barStyle="dark-content" 
-                backgroundColor="transparent" 
-                />
-              <Stack
-                screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen name="+not-found" options={{ title: 'No encontrado' }} />
-              </Stack>
-              <StatusBar style="auto" />
-              {/* Monta Toast solo en cliente móvil */}
-              {mounted && ToastComponent && <ToastComponent />}
-            </ThemeProvider>
-          </CarritoProvider>
-        </OrdersProvider>
-      </FavoritesProvider>
-    </MenuProvider>
+    <AuthProvider>
+      <MenuProvider>
+        <FavoritesProvider>
+          <OrdersProvider>
+            <CarritoProvider>
+              <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+                  {/* Este maneja los colores principales de la barra*/}
+                  <RNStatusBar 
+                  barStyle="dark-content" 
+                  backgroundColor="transparent" 
+                  />
+                <Stack
+                  screenOptions={{ headerShown: false }}>
+                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                  <Stack.Screen name="+not-found" options={{ title: 'No encontrado' }} />
+                </Stack>
+                <StatusBar style="auto" />
+                {/* Monta Toast solo en cliente móvil */}
+                {mounted && ToastComponent && <ToastComponent />}
+              </ThemeProvider>
+            </CarritoProvider>
+          </OrdersProvider>
+        </FavoritesProvider>
+      </MenuProvider>
+    </AuthProvider>
   );
 }
