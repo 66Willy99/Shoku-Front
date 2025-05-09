@@ -5,7 +5,8 @@ import Icon from '../../components/ui/Icon'; // Asegúrate de que la ruta sea co
 import { Config } from '../../constants/config'; // Asegúrate de que la ruta sea correcta
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-import { useAuth } from '@/context/authContext';
+import { useAuth } from '../../context/authContext';
+import BoldText from '@/components/ui/CustomText';
 
 const LoginScreen = () => {
 const router = useRouter();
@@ -88,10 +89,10 @@ const handleLogin = async () => {
 return (
     <View style={styles.container}>
         <View style={styles.primarySection}>
-            <Icon color={Colors.light_primary} size={350} />
+            <Icon color={Colors.light_primary} size={300} />
             <View style={{marginTop: 100 }}>
-            <Text style={styles.titleText}>Shoku - 1.0.0</Text>
-            <Text style={styles.titleText}>Gestor de restaurante</Text>
+            <BoldText style={styles.titleText}>Shoku - 1.0.0</BoldText>
+            <BoldText style={styles.titleText}>Gestor de restaurante</BoldText>
             </View>
         </View>
 
