@@ -1,4 +1,5 @@
-// app/(tabs)/estado.tsx
+// C:\Users\Ernesto\portafolio de titulo\Shoku-Front\Shoku-Front\app\(tabs)\estado.tsx
+
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -6,8 +7,9 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
+  Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useOrders, Order } from '../../context/OrdersContext';
 import { COLORS, FONT_SIZES, SPACING } from '../../theme';
@@ -26,29 +28,53 @@ const STATUS_INDEX: Record<Order['status'], number> = {
 
 export default function Estado() {
   const router = useRouter();
+  // Hook correcto en Expo Router v5+
+  const { token_ws, approved } = useLocalSearchParams<{
+    token_ws?: string;
+    approved?: 'true' | 'false';
+  }>();
   const { orders } = useOrders();
   const [now, setNow] = useState(Date.now());
 
-  // actualizar cada segundo para cuenta regresiva
+  // Actualiza reloj cada segundo
   useEffect(() => {
     const iv = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(iv);
   }, []);
 
-  const formatTime = (ms: number) =>
-    new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  // Cuando vengamos por deep-link o fallback web
+  useEffect(() => {
+    if (token_ws) {
+      Alert.alert(
+        approved === 'true' ? 'Pago aprobado' : 'Pago rechazado',
+        approved === 'true'
+          ? 'Tu pedido ha sido registrado correctamente.'
+          : 'Lo sentimos, tu pago fue rechazado.'
+      );
+      // Aquí podrías crear la orden en tu contexto si approved==='true'
+    }
+  }, [token_ws]);
 
-  const remaining = (o: Order) => {
-    const elapsed  = (now - o.timestamp) / 1000;
-    const totalSec = o.estimatedTime * 60;
-    const rem      = Math.max(totalSec - elapsed, 0);
-    const m = Math.floor(rem / 60);
-    const s = Math.floor(rem % 60).toString().padStart(2, '0');
-    return `${m}:${s}`;
-  };
+  // Si no hay órdenes en contexto pero sí token_ws, mostramos fallback
+  if (!orders.length && token_ws) {
+    const ok = approved === 'true';
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>
+          {ok ? '✅ Pedido aprobado' : '❌ Pago rechazado'}
+        </Text>
+        <TouchableOpacity
+          style={styles.btn}
+          onPress={() => router.push('/carta')}
+        >
+          <Text style={styles.btnText}>🛒 Volver a la Carta</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
-  // si no hay pedidos activos ni historial:
-  if (orders.length === 0) {
+  // Si no hay órdenes y tampoco token_ws
+  if (!orders.length) {
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>Aún no tienes ningún pedido.</Text>
@@ -62,8 +88,21 @@ export default function Estado() {
     );
   }
 
+  // Renderizado normal de pedidos en contexto
   const activos     = orders.filter(o => o.status !== 'completado');
   const completados = orders.filter(o => o.status === 'completado');
+
+  const formatTime = (ms: number) =>
+    new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  const remaining = (o: Order) => {
+    const elapsed  = (now - o.timestamp) / 1000;
+    const totalSec = o.estimatedTime * 60;
+    const rem      = Math.max(totalSec - elapsed, 0);
+    const m = Math.floor(rem / 60);
+    const s = Math.floor(rem % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -71,7 +110,6 @@ export default function Estado() {
         const idx = STATUS_INDEX[o.status];
         return (
           <View key={o.id} style={styles.section}>
-            {/* Cabecera de datos */}
             <Text style={styles.sectionTitle}>Datos de tu pedido</Text>
             <View style={styles.infoRow}>
               <MaterialCommunityIcons name="receipt" size={20} color="#fff" />
@@ -90,7 +128,6 @@ export default function Estado() {
               </Text>
             </View>
 
-            {/* Línea de tiempo */}
             <View style={styles.timelineCard}>
               {STEPS.map((step, i) => {
                 const isActive = i <= idx;
@@ -128,9 +165,7 @@ export default function Estado() {
               })}
             </View>
 
-            {o.notes ? (
-              <Text style={styles.notes}>📋 Notas: {o.notes}</Text>
-            ) : null}
+            {o.notes && <Text style={styles.notes}>📋 Notas: {o.notes}</Text>}
           </View>
         );
       })}
@@ -150,7 +185,7 @@ export default function Estado() {
                 {o.items.map((i, ix) => (
                   <Text key={ix}>• {i.name} ×{i.quantity}</Text>
                 ))}
-                {o.notes ? <Text>📋 Notas: {o.notes}</Text> : null}
+                {o.notes && <Text>📋 Notas: {o.notes}</Text>}
               </View>
             );
           })}
