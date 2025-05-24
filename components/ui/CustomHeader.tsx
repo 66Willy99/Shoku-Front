@@ -4,47 +4,48 @@ import { Link, usePathname } from 'expo-router';
 import { Colors } from '../../constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
 import '../../global.css';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/authContext';
+import { getSession } from '../../services/sessionService'; 
+import BoldText from './CustomText';
+
 
 export default function CustomHeader({ excludeRoutes = [] }: { excludeRoutes?: string[] }) {
     const pathname = usePathname();
     const [userName, setUserName] = useState<string>('');
-    const { logout } = useAuth();
+    const { isAuthenticated, logout } = useAuth();
+    const [hasRestaurants, setHasRestaurants] = useState<boolean>(false);
 
     useEffect(() => {
         let isMounted = true; // Para evitar actualizar el estado si el componente se desmontó
 
-        const fetchUserData = async () => {
+        const loadUserData = async () => {
             try {
-                const userDataString = await AsyncStorage.getItem("userData");
-                
-                if (userDataString) {
-                    const userData = JSON.parse(userDataString);
-                    if (isMounted && userData.nombre) {
-                        setUserName(userData.nombre);
-                    }
+                const session = await getSession();
+                if (session && isMounted) {
+                    setUserName(session.userName);
+                    setHasRestaurants(session.restaurantIds.length > 0);
                 }
             } catch (error) {
-                console.error("Error al cargar datos del usuario:", error);
+                console.error('Error al cargar datos del usuario header', error);
             }
         };
-        fetchUserData();
-        const retryTimer = setTimeout(() => {
-            fetchUserData();
-        }, 300);
+
+        if (isAuthenticated) {
+            loadUserData();
+        } else {
+            setUserName('');
+            setHasRestaurants(false);
+        }
 
         return () => {
             isMounted = false;
-            clearTimeout(retryTimer);
         };
-    }, []);
+    }, [isAuthenticated]);
 
     const handleLogout = async () => {
         try {
             await logout();
-            await AsyncStorage.removeItem('userData');
             setUserName('');
         } catch (error) {
             console.error("Error al cerrar sesión:", error);
@@ -63,21 +64,24 @@ export default function CustomHeader({ excludeRoutes = [] }: { excludeRoutes?: s
                     <Link href="/admin/reports" style={styles.navLink}>
                         <Text>Reportes</Text>
                     </Link>
-                    <Link href="/admin/add-restaurant" style={styles.navLink}>
-                        <Text>Añadir Restaurante</Text>
-                    </Link>
-                    <Link href="/admin/restaurant" style={styles.navLink}>
-                        <Text>Restaurante</Text>
-                    </Link>
+                    {hasRestaurants ? (
+                        <Link href="/admin/restaurant" style={styles.navLink}>
+                            <Text>Restaurante</Text>
+                        </Link>
+                    ) : (
+                        <Link href="/admin/add-restaurant" style={styles.navLink}>
+                            <Text>Añadir Restaurante</Text>
+                        </Link>
+                    )}
                 </View>
                 <View style={styles.logoutContainer}>
-                    {userName ? (
-                        <Text style={styles.userName}>
+                    {userName && (
+                        <BoldText style={styles.userName}>
                             {userName.charAt(0).toUpperCase() + userName.slice(1)}
-                        </Text>
-                    ) : null}
+                        </BoldText>
+                    )}
                     <TouchableOpacity onPress={handleLogout}>
-                        <Ionicons name="power" size={24} color={Colors.light_primary} />
+                        <Ionicons name="power" size={24} color={'white'} />
                     </TouchableOpacity>
                 </View>
             </View>
@@ -113,7 +117,7 @@ const styles = StyleSheet.create({
         fontFamily: 'BalooBold',
         padding: 8,
         borderRadius: 4,
-        color: Colors.light_primary,
+        color: 'white',
     },
     logoutContainer: {
         marginLeft: 'auto',
@@ -122,7 +126,7 @@ const styles = StyleSheet.create({
         gap: 10,
     },
     userName: {
-        color: Colors.light_primary,
+        color: 'white',
         fontSize: 24,
         fontFamily: 'BalooBold',
     },

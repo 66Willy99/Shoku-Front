@@ -1,22 +1,37 @@
 import { Stack, useSegments ,Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import CustomHeader from '../../components/ui/CustomHeader';
 import { useAuth } from '@/context/authContext';
+import { getSession } from '@/services/sessionService'; 
 
 export default function AdminLayout() {
     const { isAuthenticated, loading } = useAuth();
     const segments = useSegments();
     const [readyToRedirect, setReadyToRedirect] = useState(false);
+    const [hasRestaurants, setHasRestaurants] = useState<boolean | null>(null);
 
     useEffect(() => {
-        if (!loading) {
-            // Espera unos milisegundos para que el router esté montado
-            setTimeout(() => {
-                setReadyToRedirect(true);
-            }, 50);
-        }
+        const checkRestaurants = async () => {
+            if (!loading) {
+                try {
+                    const session = await getSession();
+                    if (session) {
+                        setHasRestaurants(session.restaurantIds.length > 0);
+                    } else {
+                        setHasRestaurants(false);
+                    }
+                } catch (error) {
+                    console.error('Error checking restaurants:', error);
+                    setHasRestaurants(false);
+                } finally {
+                    setTimeout(() => {
+                        setReadyToRedirect(true);
+                    }, 50);
+                }
+            }
+        };
+        checkRestaurants();
     }, [loading]);
 
     
@@ -35,8 +50,10 @@ export default function AdminLayout() {
         return <Redirect href="/admin" />;
     }
     if (isAuthenticated && isOnLoginPage) {
-        console.log('autenticado');
-        return <Redirect href="/admin/add-restaurant" />;
+        console.log('Autenticado, redirigiendo según restaurantes');
+            return hasRestaurants 
+                ? <Redirect href="/admin/restaurant" /> 
+                : <Redirect href="/admin/add-restaurant" />;
     }
 
     return (

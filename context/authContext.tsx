@@ -4,37 +4,82 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 type AuthContextType = {
     isAuthenticated: boolean;
     loading: boolean;
-    login: (userId: string) => Promise<void>;
+    userId: string | null;
+    restaurantId: string | null;
+    login: (userId: string, restaurantId?: string) => Promise<void>;
     logout: () => Promise<void>;
+    updateRestaurantId: (restaurantId: string | null) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [userId, setUserId] = useState<string | null>(null);
+    const [restaurantId, setRestaurantId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
+    // Cargar sesión al iniciar
     useEffect(() => {
-        const checkAuth = async () => {
-            const userId = await AsyncStorage.getItem('userId');
-            setIsAuthenticated(!!userId);
-            setLoading(false);
+        const loadSession = async () => {
+            try {
+                const [savedUserId, savedRestaurantId] = await AsyncStorage.multiGet([
+                    'userId',
+                    'restaurantId'
+                ]);
+                
+                setUserId(savedUserId[1]);
+                setRestaurantId(savedRestaurantId[1] || null);
+            } catch (error) {
+                console.error('Error loading session:', error);
+            } finally {
+                setLoading(false);
+            }
         };
-        checkAuth();
+
+        loadSession();
     }, []);
 
-    const login = async (userId: string) => {
-        await AsyncStorage.setItem('userId', userId);
-        setIsAuthenticated(true);
+    // Iniciar sesión
+    const login = async (userId: string, restaurantId?: string) => {
+        const itemsToSet: [string, string][] = [
+            ['userId', userId],
+            ['restaurantId', restaurantId || '']
+        ];
+        
+        await AsyncStorage.multiSet(itemsToSet);
+        setUserId(userId);
+        setRestaurantId(restaurantId || null);
     };
 
+    // Cerrar sesión
     const logout = async () => {
-        await AsyncStorage.removeItem('userId');
-        setIsAuthenticated(false);
+        await AsyncStorage.multiRemove(['userId', 'restaurantId', 'authToken', 'userName', 'restaurantIds', 'userInfo']);	
+        setUserId(null);
+        setRestaurantId(null);
+    };
+
+    // Actualizar solo el restaurantId
+    const updateRestaurantId = async (newRestaurantId: string | null) => {
+        if (newRestaurantId) {
+            await AsyncStorage.setItem('restaurantId', newRestaurantId);
+        } else {
+            await AsyncStorage.removeItem('restaurantId');
+        }
+        setRestaurantId(newRestaurantId);
     };
 
     return (
-        <AuthContext.Provider value={{ isAuthenticated, loading, login, logout }}>
+        <AuthContext.Provider
+        value={{
+            isAuthenticated: !!userId,
+            loading,
+            userId,
+            restaurantId,
+            login,
+            logout,
+            updateRestaurantId
+        }}
+        >
         {children}
         </AuthContext.Provider>
     );

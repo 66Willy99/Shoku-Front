@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { Colors } from '../../constants/Colors'; // Asegúrate de que la ruta sea correcta
-import Icon from '../../components/ui/Icon'; // Asegúrate de que la ruta sea correcta
-import { Config } from '../../constants/config'; // Asegúrate de que la ruta sea correcta
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Colors } from '../../constants/Colors'; 
+import Icon from '../../components/ui/Icon';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/authContext';
 import BoldText from '@/components/ui/CustomText';
+import { saveSession } from '../../services/sessionService'; 
+import { Config } from '../../constants/config';
+
 
 const LoginScreen = () => {
 const router = useRouter();
@@ -16,66 +17,60 @@ const [password, setPassword] = useState<string>('');
 
 const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-    Alert.alert('Error', 'Por favor, completa todos los campos');
-    console.log('Error', 'Por favor, completa todos los campos')
-    return;
+        Alert.alert('Error', 'Por favor, completa todos los campos');
+        console.log('Error', 'Por favor, completa todos los campos')
+        return;
     }
 
     if (!/^\S+@\S+\.\S+$/.test(email)) {
-    Alert.alert('Error', 'Ingresa un correo electrónico válido');
-    console.log('Error', 'Ingresa un correo electrónico válido')
-    return;
+        Alert.alert('Error', 'Ingresa un correo electrónico válido');
+        console.log('Error', 'Ingresa un correo electrónico válido')
+        return;
     }
 
     try {
-    // 1. Primero hacemos login para obtener el UID
-    const loginResponse = await fetch(`${Config.API_URL}/user/auth`, {
-        method: 'POST',
-        headers: {
-        'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-        email: email.trim(),
-        password: password.trim(),
-        }),
-    });
+        // 1. Primero hacemos login para obtener el UID
+        const loginResponse = await fetch(`${Config.API_URL}/user/auth`, {
+            method: 'POST',
+            headers: {
+            'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                email: email.trim(),
+                password: password.trim(),
+            }),
+        });
 
-    const loginData = await loginResponse.json();
+        const loginData = await loginResponse.json();
 
-    if (!loginResponse.ok) {
-        throw new Error(loginData.detail || 'Error en el inicio de sesión');
-    }
+        if (!loginResponse.ok) {
+            throw new Error(loginData.detail || 'Error en el inicio de sesión');
+        }
 
-    await AsyncStorage.setItem('userId', loginData.userId);
-    await login(loginData.userId); 
+        console.log('Login exitoso, UID:', loginData.localId);
 
-    console.log('Login exitoso, UID:', loginData.uid);
-    router.push({
-        pathname: '/admin/add-restaurant'
-    });
+        const restaurantesResponse = await fetch(`${Config.API_URL}/restaurants/?user_id=${loginData.localId}`);
+        
+        if (!restaurantesResponse.ok) {
+            throw new Error('Error al obtener restaurantes');
+        }
 
-    // 2. Luego obtenemos los datos del usuario usando el UID
-    const userResponse = await fetch(`${Config.API_URL}/user?userId=${loginData.uid}`);
-    
-    if (!userResponse.ok) {
-        const errorData = await userResponse.json();
-        throw new Error(errorData.detail || 'Error al obtener datos del usuario');
-    }
+        const restaurantes = await restaurantesResponse.json();
+        
+        // Extraer solo los IDs (asumiendo que la API devuelve objeto con IDs como claves)
+        const restaurantIds = Object.keys(restaurantes);
 
-    const userData = await userResponse.json();
-    const userInfo = userData[loginData.uid]; // Extraemos los datos del objeto
+        console.log('Restaurantes:', restaurantIds);
 
-    console.log('Datos del usuario:', userInfo); 
+        await login(loginData.localId, restaurantIds[0] || undefined);
 
-    // Guardamos los datos importantes
-    await AsyncStorage.multiSet([
-        ['authToken', loginData.token || ''], // Si tu API devuelve un token
-        ['userId', loginData.uid],
-        ['userData', JSON.stringify(userInfo)]
-    ]);
-
-    // Redirigimos según el nivel de suscripción
-    
+        // Guardamos los datos importantes
+        await saveSession({
+            token: loginData.idToken,
+            uid: loginData.localId,
+            restaurantIds // Enviamos el array completo
+        });
+        
 
     } catch (error: any) {
     console.error('Error completo:', error);
