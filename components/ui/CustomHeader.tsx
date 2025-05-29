@@ -8,6 +8,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/authContext';
 import { getSession } from '../../services/sessionService'; 
 import BoldText from './CustomText';
+import { Config } from '../../constants/config';
 
 
 export default function CustomHeader({ excludeRoutes = [] }: { excludeRoutes?: string[] }) {
@@ -23,7 +24,16 @@ export default function CustomHeader({ excludeRoutes = [] }: { excludeRoutes?: s
             try {
                 const session = await getSession();
                 if (session && isMounted) {
-                    setUserName(session.userName);
+                    const response = await fetch(`${Config.API_URL}/user/?userId=${session.userId}`);
+
+                    if (!response.ok) {
+                        console.log('Error al obtener datos del usuario');
+                    }
+
+                    const userData = await response.json();
+                    const userDetails = userData[session.userId];
+
+                    setUserName(userDetails.nombre);
                     setHasRestaurants(session.restaurantIds.length > 0);
                 }
             } catch (error) {
@@ -59,18 +69,18 @@ export default function CustomHeader({ excludeRoutes = [] }: { excludeRoutes?: s
     return (
         <SafeAreaView style={styles.safeArea}>
             <View style={styles.header}>
-                <Text style={styles.title}>Shoku Admin</Text>
+                <BoldText style={styles.title}>Shoku Admin</BoldText>
                 <View style={styles.nav}>
                     <Link href="/admin/reports" style={styles.navLink}>
-                        <Text>Reportes</Text>
+                        <BoldText>Reportes</BoldText>
                     </Link>
                     {hasRestaurants ? (
                         <Link href="/admin/restaurant" style={styles.navLink}>
-                            <Text>Restaurante</Text>
+                            <BoldText>Restaurante</BoldText>
                         </Link>
                     ) : (
                         <Link href="/admin/add-restaurant" style={styles.navLink}>
-                            <Text>Añadir Restaurante</Text>
+                            <BoldText>Añadir Restaurante</BoldText>
                         </Link>
                     )}
                 </View>
