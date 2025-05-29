@@ -12,6 +12,7 @@ export interface Order {
   estimatedTime:  number;
   timestamp:      number;
   status:         OrderStatus;
+  paid:           boolean;
 }
 
 interface OrdersContextType {
@@ -21,7 +22,8 @@ interface OrdersContextType {
     notes: string,
     tipIncluded: boolean,
     estimatedTime: number
-  ) => void;
+  ) => number;
+  markAsPaid: (orderId: number) => void;
 }
 
 const OrdersContext = createContext<OrdersContextType | null>(null);
@@ -35,9 +37,18 @@ export const OrdersProvider = ({ children }: { children: ReactNode }) => {
     tipIncluded: boolean,
     estimatedTime: number
   ) => {
-    const id        = Math.floor(1000 + Math.random() * 9000);
+    const id = Math.floor(1000 + Math.random() * 9000);
     const timestamp = Date.now();
-    const newOrder: Order = { id, items, notes, tipIncluded, estimatedTime, timestamp, status: 'en progreso' };
+    const newOrder: Order = {
+      id,
+      items,
+      notes,
+      tipIncluded,
+      estimatedTime,
+      timestamp,
+      status: 'en progreso',
+      paid: false,
+    };
     setOrders(prev => [...prev, newOrder]);
 
     // Simula el avance de estado
@@ -47,10 +58,16 @@ export const OrdersProvider = ({ children }: { children: ReactNode }) => {
         setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'completado' } : o));
       }, 60000);
     }, estimatedTime * 60000);
+
+    return id;
+  };
+
+  const markAsPaid = (orderId: number) => {
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, paid: true } : o));
   };
 
   return (
-    <OrdersContext.Provider value={{ orders, addOrder }}>
+    <OrdersContext.Provider value={{ orders, addOrder, markAsPaid }}>
       {children}
     </OrdersContext.Provider>
   );

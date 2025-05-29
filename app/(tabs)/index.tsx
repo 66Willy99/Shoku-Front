@@ -9,47 +9,57 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { COLORS, FONT_SIZES, SPACING } from '../../theme';
+import { useOrders } from '../../context/OrdersContext';
 
 export default function Home() {
   const router = useRouter();
   const [waiterModal, setWaiterModal] = useState(false);
+  const { orders } = useOrders();
 
   const showWaiter = () => {
     setWaiterModal(true);
     setTimeout(() => setWaiterModal(false), 2000);
   };
 
+  // ✅ Mostrar botón si hay un pedido NO PAGADO, sin importar el estado
+  const tienePedidoNoPagado = orders.some(o => !o.paid);
+
   return (
     <View style={styles.container}>
+      {/* Logo principal */}
       <Image
         source={require('../../assets/images/shoku-logo.png')}
         style={styles.logo}
         resizeMode="contain"
       />
 
-      {/* Llamar a Mesero */}
-      <TouchableOpacity
-        onPress={showWaiter}
-        style={[styles.button, { backgroundColor: COLORS.primary }]}
-      >
-        <Text style={styles.buttonText}>🔔 Llamar a Mesero</Text>
-      </TouchableOpacity>
-      {/* Pagar (deshabilitado si no hay productos) */}
-      <TouchableOpacity
-        onPress={() => router.push('/pago')}
-        style={[styles.button, { backgroundColor: COLORS.primary }]}
-      >
-        <Text style={styles.buttonText}>💳 Pagar</Text>
-      </TouchableOpacity>
-
       {/* Ver Carta */}
       <TouchableOpacity
         onPress={() => router.push('/carta')}
-        style={[styles.button, { backgroundColor: COLORS.primary }]}
+        style={styles.button}
       >
-        <Text style={styles.buttonText}>🛒 Ver Carta</Text>
+        <Text style={styles.buttonText}>📋 Ver Carta</Text>
       </TouchableOpacity>
 
+      {/* Llamar al mesero */}
+      <TouchableOpacity
+        onPress={showWaiter}
+        style={[styles.button, styles.secondaryButton]}
+      >
+        <Text style={styles.buttonText}>🔔 Llamar a Mesero</Text>
+      </TouchableOpacity>
+
+      {/* Pagar pedido si hay alguno no pagado */}
+      {tienePedidoNoPagado && (
+        <TouchableOpacity
+          onPress={() => router.push('/pago')}
+          style={[styles.button, styles.payButton]}
+        >
+          <Text style={styles.buttonText}>💳 Pagar pedido actual</Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Modal de mesero en camino */}
       <Modal
         visible={waiterModal}
         transparent
@@ -58,7 +68,7 @@ export default function Home() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>Mesero en camino</Text>
+            <Text style={styles.modalTitle}>🧑‍🍳 Mesero en camino</Text>
             <Text style={styles.modalMsg}>⏰ Tiempo estimado: 3 minutos</Text>
           </View>
         </View>
@@ -76,16 +86,23 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
   },
   logo: {
-    width: 120,
-    height: 120,
+    width: 140,
+    height: 140,
     marginBottom: SPACING.xl,
   },
   button: {
-    width: '70%',
+    width: '80%',
+    backgroundColor: COLORS.primary,
     paddingVertical: SPACING.md,
-    borderRadius: 8,
+    borderRadius: 10,
     alignItems: 'center',
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.md,
+  },
+  secondaryButton: {
+    backgroundColor: COLORS.secondary,
+  },
+  payButton: {
+    backgroundColor: COLORS.primary,
   },
   buttonText: {
     color: COLORS.white,
