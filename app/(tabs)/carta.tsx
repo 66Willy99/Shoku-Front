@@ -1,5 +1,3 @@
-// app/(tabs)/carta.tsx
-
 import React, { useRef, useEffect, useState } from 'react';
 import {
   ScrollView,
@@ -16,23 +14,28 @@ import { useFavorites } from '../../context/FavoritesContext';
 import { useCarrito } from '../../context/CarritoContext';
 import { dishImages } from '../../assets/images';
 import { COLORS, FONT_SIZES, SPACING } from '../../theme';
+import { useRouter } from 'expo-router';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const H_PAD  = SPACING.md;
-const GAP    = SPACING.sm;
-// Dos columnas en móvil
+const H_PAD = SPACING.md;
+const GAP = SPACING.sm;
 const CARD_W = (SCREEN_WIDTH - H_PAD * 2 - GAP) / 2;
 
-type Dish = { name: string; price: number };
+type Dish = {
+  name: string;
+  price: number;
+  description?: string;
+};
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 export default function Carta() {
-  const menu        = useMenu();
-  const allDishes   = Object.values(menu).flat() as Dish[];
+  const menu = useMenu();
+  const { carrito } = useCarrito();
+  const router = useRouter();
+  const allDishes = Object.values(menu).flat() as Dish[];
   const recommended = allDishes.slice(0, 6);
 
-  // Carousel auto-scroll
   const carouselRef = useRef<ScrollView>(null);
   let idx = 0;
   useEffect(() => {
@@ -48,59 +51,64 @@ export default function Carta() {
   }, [recommended]);
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer}
-    >
-      <Text style={styles.mainTitle}>CARTA</Text>
+    <View style={styles.fullScreen}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+        <Text style={styles.mainTitle}>CARTA</Text>
 
-      <Text style={styles.sectionTitle}>Recomendados</Text>
-      <ScrollView
-        ref={carouselRef}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        snapToInterval={CARD_W + GAP}
-        decelerationRate="fast"
-        contentContainerStyle={styles.carouselContent}
-      >
-        {recommended.map((dish, i) => (
-          <View
-            key={dish.name}
-            style={[
-              styles.carouselItem,
-              { marginRight: i < recommended.length - 1 ? GAP : 0 },
-            ]}
-          >
-            <Card dish={dish} />
-          </View>
-        ))}
+        <Text style={styles.sectionTitle}>Recomendados</Text>
+        <ScrollView
+          ref={carouselRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          snapToInterval={CARD_W + GAP}
+          decelerationRate="fast"
+          contentContainerStyle={styles.carouselContent}
+        >
+          {recommended.map((dish, i) => (
+            <View
+              key={dish.name}
+              style={[
+                styles.carouselItem,
+                { marginRight: i < recommended.length - 1 ? GAP : 0 },
+              ]}
+            >
+              <Card dish={dish} />
+            </View>
+          ))}
+        </ScrollView>
+
+        <Text style={styles.sectionTitle}>Todos los platos</Text>
+        <View style={styles.grid}>
+          {allDishes.map((dish) => (
+            <View key={dish.name} style={styles.gridItem}>
+              <Card dish={dish} />
+            </View>
+          ))}
+        </View>
       </ScrollView>
 
-      <Text style={styles.sectionTitle}>Todos los platos</Text>
-      <View style={styles.grid}>
-        {allDishes.map((dish) => (
-          <View key={dish.name} style={styles.gridItem}>
-            <Card dish={dish} />
-          </View>
-        ))}
-      </View>
-    </ScrollView>
+      {carrito.length > 0 && (
+        <TouchableOpacity style={styles.continuarBtn} onPress={() => router.push('/carrito')}>
+          <Text style={styles.continuarText}>🧾 Continuar pedido</Text>
+        </TouchableOpacity>
+      )}
+    </View>
   );
 }
 
 function Card({ dish }: { dish: Dish }) {
   const { favorites, toggle } = useFavorites();
-  const { agregarProducto }   = useCarrito();
+  const { agregarProducto } = useCarrito();
   const isFav = favorites.includes(dish.name);
 
   const scale = useRef(new Animated.Value(1)).current;
   const [feedback, setFeedback] = useState('');
-  const fbOpacity              = useRef(new Animated.Value(0)).current;
+  const fbOpacity = useRef(new Animated.Value(0)).current;
 
   const bump = () => {
     Animated.sequence([
       Animated.spring(scale, { toValue: 1.2, friction: 3, useNativeDriver: true }),
-      Animated.spring(scale, { toValue: 1,   friction: 3, useNativeDriver: true }),
+      Animated.spring(scale, { toValue: 1, friction: 3, useNativeDriver: true }),
     ]).start();
   };
   const showFeedback = (msg: string) => {
@@ -114,7 +122,7 @@ function Card({ dish }: { dish: Dish }) {
 
   const onAdd = () => {
     bump();
-    agregarProducto(dish.name);   // ← ahora pasamos el nombre
+    agregarProducto(dish.name);
     showFeedback('¡Agregado!');
   };
   const onFav = () => {
@@ -130,6 +138,9 @@ function Card({ dish }: { dish: Dish }) {
         <Text style={styles.name}>{dish.name}</Text>
         <Text style={styles.price}>${dish.price.toLocaleString()}</Text>
       </View>
+      {dish.description && (
+        <Text style={styles.description}>{dish.description}</Text>
+      )}
       <View style={styles.actions}>
         <AnimatedTouchable onPress={onFav} style={{ transform: [{ scale }] }}>
           <Text style={[styles.icon, isFav && { color: COLORS.secondary }]}>
@@ -148,6 +159,10 @@ function Card({ dish }: { dish: Dish }) {
 }
 
 const styles = StyleSheet.create({
+  fullScreen: {
+    flex: 1,
+    position: 'relative',
+  },
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
@@ -155,7 +170,7 @@ const styles = StyleSheet.create({
   contentContainer: {
     paddingHorizontal: H_PAD,
     paddingTop: SPACING.lg,
-    paddingBottom: SPACING.xl,
+    paddingBottom: SPACING.xl + 80, // espacio extra para el botón flotante
   },
   mainTitle: {
     fontSize: FONT_SIZES.title,
@@ -189,12 +204,10 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderRadius: 8,
     overflow: 'hidden',
-    // sombra iOS
     shadowColor: '#000',
     shadowOpacity: 0.1,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
-    // elevación Android
     elevation: 2,
   },
   image: {
@@ -217,6 +230,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.primary,
     marginLeft: SPACING.xs,
+  },
+  description: {
+    fontSize: FONT_SIZES.small,
+    color: COLORS.grayDark,
+    paddingHorizontal: SPACING.sm,
+    paddingBottom: SPACING.sm,
   },
   actions: {
     flexDirection: 'row',
@@ -252,5 +271,25 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.xs,
     borderRadius: 12,
     fontWeight: '600',
+  },
+  continuarBtn: {
+    position: 'absolute',
+    bottom: 20,
+    left: '10%',
+    right: '10%',
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.md,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+  continuarText: {
+    color: COLORS.white,
+    fontSize: FONT_SIZES.body,
+    fontWeight: 'bold',
   },
 });
