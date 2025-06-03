@@ -68,6 +68,7 @@ export default function AdminLayout() {
             <Stack.Screen name="add-restaurant" />
             <Stack.Screen name="reports" />
             <Stack.Screen name="restaurant" />
+            <Stack.Screen name="AddWorker" />
         </Stack>
         </View>
     );
