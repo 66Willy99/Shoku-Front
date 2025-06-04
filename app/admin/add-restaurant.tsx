@@ -49,7 +49,7 @@ export default function AdminScreen() {
                     telefono: ''
                 });
                 router.push({
-                    pathname: '/admin/reports'
+                    pathname: '/admin/restaurant'
                 });
             });
         } catch (error) {
