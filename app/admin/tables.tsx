@@ -15,7 +15,7 @@ type Mesa = {
 
 export default function MesaTable() {
     const [mesas, setMesas] = useState<{ [id: string]: Mesa }>({});
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [selectedMesaId, setSelectedMesaId] = useState<string | null>(null);
     const [formValues, setFormValues] = useState<Mesa>({ capacidad: 0, numero: 0, estado: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -25,7 +25,6 @@ export default function MesaTable() {
     const formOpacity = useRef(new Animated.Value(0)).current;
 
     const fetchMesas = async () => {
-        setLoading(true);
         try {
             const userId = await AsyncStorage.getItem('userId');
             const restauranteId = await AsyncStorage.getItem('restaurantId');
@@ -110,11 +109,7 @@ export default function MesaTable() {
 
     if (isSubmitting) {
         return (<LoadingScreen message="Actualizando mesa..." />);
-    }  
-    
-    if(loading){
-        return (<LoadingScreen message='Cargando mesas...'/>);
-    }
+    }   
 
     if (loading) return <Text>Cargando mesas...</Text>;
 
