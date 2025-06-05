@@ -4,6 +4,7 @@ import { View, ActivityIndicator } from 'react-native';
 import CustomHeader from '../../components/ui/CustomHeader';
 import { useAuth } from '@/context/authContext';
 import { getSession } from '@/services/sessionService'; 
+import { Colors } from '@/constants/Colors'; 
 
 export default function AdminLayout() {
     const { isAuthenticated, loading } = useAuth();
@@ -57,7 +58,7 @@ export default function AdminLayout() {
     }
 
     return (
-        <View style={{ flex: 1, backgroundColor: '#eee9e5' }}>
+        <View style={{ flex: 1, backgroundColor: Colors.bg_light }}>
         <CustomHeader excludeRoutes={['/admin']} />
         <Stack
             screenOptions={{
@@ -69,6 +70,7 @@ export default function AdminLayout() {
             <Stack.Screen name="reports" />
             <Stack.Screen name="restaurant" />
             <Stack.Screen name="AddWorker" />
+            <Stack.Screen name="tables" />
         </Stack>
         </View>
     );
