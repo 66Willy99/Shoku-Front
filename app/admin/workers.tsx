@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import "../../global.css";
-import { Platform, View, Text, Image, ScrollView, Touchable, TouchableOpacity, TextInput, StyleSheet } from "react-native";
+import { Platform, View, Text, Image, ScrollView, Touchable, TouchableOpacity, TextInput } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { Redirect } from "expo-router";
 
@@ -204,8 +204,4 @@ const handleChange = (name: string, value: string) => {
             </View>
         </View>
     );
-};
-
-const styles = StyleSheet.create({
-
-});
+}
