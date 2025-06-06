@@ -7,6 +7,7 @@ import { useAuth } from '../../context/authContext';
 import BoldText from '@/components/ui/CustomText';
 import { saveSession } from '../../services/sessionService'; 
 import { Config } from '../../constants/config';
+import LoadingScreen from '@/components/ui/LoadingScreen';
 
 
 const LoginScreen = () => {
@@ -14,6 +15,7 @@ const router = useRouter();
 const { login } = useAuth();
 const [email, setEmail] = useState<string>('');
 const [password, setPassword] = useState<string>('');
+const [isSubmitting, setIsSubmitting] = useState(false);
 
 const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -27,7 +29,7 @@ const handleLogin = async () => {
         console.log('Error', 'Ingresa un correo electrónico válido')
         return;
     }
-
+    setIsSubmitting(true);
     try {
         // 1. Primero hacemos login para obtener el UID
         const loginResponse = await fetch(`${Config.API_URL}/user/auth`, {
@@ -73,13 +75,19 @@ const handleLogin = async () => {
         
 
     } catch (error: any) {
-    console.error('Error completo:', error);
-    Alert.alert(
-        'Error', 
-        error.message || 'Ocurrió un error durante el proceso'
-    );
+        console.error('Error completo:', error);
+        Alert.alert(
+            'Error', 
+            error.message || 'Ocurrió un error durante el proceso'
+        );
+    }finally{
+        setIsSubmitting(false);
     }
 };
+
+if (isSubmitting) {
+    return (<LoadingScreen message="Iniciando sesion..." />);
+}  
 
 return (
     <View style={styles.container}>
