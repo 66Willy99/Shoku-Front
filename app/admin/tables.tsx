@@ -25,6 +25,7 @@ export default function MesaTable() {
     const formOpacity = useRef(new Animated.Value(0)).current;
 
     const fetchMesas = async () => {
+        setLoading(true);
         try {
             const userId = await AsyncStorage.getItem('userId');
             const restauranteId = await AsyncStorage.getItem('restaurantId');
@@ -111,7 +112,9 @@ export default function MesaTable() {
         return (<LoadingScreen message="Actualizando mesa..." />);
     }   
 
-    if (loading) return <Text>Cargando mesas...</Text>;
+    if (loading) {
+        return (<LoadingScreen message="Cargando mesas..." />);
+    }   
 
     return (
         <View style={styles.container}>
