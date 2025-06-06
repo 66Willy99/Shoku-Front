@@ -14,6 +14,7 @@ const STEPS = [
   { key: 'finished', icon: 'clock-end', label: 'Terminado' },
   { key: 'delivered', icon: 'food-fork-drink', label: 'Entregado' },
 ];
+
 const STATUS_INDEX: Record<Order['status'], number> = {
   'en progreso': 1,
   'listo': 2,
@@ -24,10 +25,14 @@ export default function Estado() {
   const router = useRouter();
   const { token_ws, approved } = useLocalSearchParams<{
     token_ws?: string;
-    approved?: 'true' | 'false';
+    approved?: string;
   }>();
+
   const { orders } = useOrders();
   const [now, setNow] = useState(Date.now());
+
+  // Convertimos el parámetro a booleano robustamente
+  const isApproved = approved?.toLowerCase() === 'true';
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
@@ -37,8 +42,8 @@ export default function Estado() {
   useEffect(() => {
     if (token_ws) {
       Alert.alert(
-        approved === 'true' ? '✅ Pago aprobado' : '❌ Pago rechazado',
-        approved === 'true'
+        isApproved ? '✅ Pago aprobado' : '❌ Pago rechazado',
+        isApproved
           ? 'Tu pedido ha sido registrado correctamente.'
           : 'Lo sentimos, tu pago fue rechazado.'
       );
@@ -61,11 +66,10 @@ export default function Estado() {
   };
 
   if (!orders.length && token_ws) {
-    const ok = approved === 'true';
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>
-          {ok ? '✅ Pedido aprobado' : '❌ Pago rechazado'}
+          {isApproved ? '✅ Pedido aprobado' : '❌ Pago rechazado'}
         </Text>
         <TouchableOpacity
           style={styles.btn}

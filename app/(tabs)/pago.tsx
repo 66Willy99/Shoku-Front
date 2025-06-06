@@ -76,7 +76,7 @@ export default function Pago() {
       Alert.alert('Error', 'No se pudo iniciar el pago');
     }
   }
-
+//confirmar pedido modal
   const confirmarPedido = () => {
     setConfirmModal(false);
 
