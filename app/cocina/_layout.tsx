@@ -1,6 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { View, Text, TouchableOpacity, ScrollView } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Config } from "@/constants/config";
+import Swal from 'sweetalert2'
+import { Colors } from "@/constants/Colors";
+import LoadingScreen from '@/components/ui/LoadingScreen';
 
 const CocinaLayout = ({ children }: { children: React.ReactNode }) => {
     const ws = useRef<WebSocket | null>(null);
@@ -13,9 +17,18 @@ const CocinaLayout = ({ children }: { children: React.ReactNode }) => {
         }[]
     >([]);
 
+    const [pedidosPreparacion, setPedidosPreparacion] = useState<
+    {
+        pedido_id: string;
+        mesa_numero: number | string;
+        platos: { nombre: string; cantidad: number }[];
+    }[]
+>([]);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
     // Obtener pedidos confirmados al montar el componente
     useEffect(() => {
-        const fetchPedidosConfirmados = async () => {
+        const fetchPedidos = async () => {
             const trabajadorStr = await AsyncStorage.getItem("trabajador");
             if (!trabajadorStr) return;
             const trabajador = JSON.parse(trabajadorStr);
@@ -23,13 +36,16 @@ const CocinaLayout = ({ children }: { children: React.ReactNode }) => {
             const restaurante_id = trabajador.restaurante_id;
             if (!user_id || !restaurante_id) return;
 
-            const response = await fetch(
-                `http://127.0.0.1:8000/pedidos?user_id=${user_id}&restaurante_id=${restaurante_id}`
-            );
+            setIsSubmitting(true);
+            try {
+                
             
+            const response = await fetch(
+                `${Config.API_URL}/pedidos/?user_id=${user_id}&restaurante_id=${restaurante_id}`
+            );
             const data = await response.json();
-            console.log(data.pedidos);
-            // Filtrar solo los pedidos cuyo estado_actual sea "confirmado"
+
+            // Confirmados
             const pedidosConfirmados = Object.entries(data.pedidos)
                 .filter(([_, pedido]: any) => pedido.estados?.estado_actual === "confirmado")
                 .map(([pedido_id, pedido]: any) => ({
@@ -37,27 +53,56 @@ const CocinaLayout = ({ children }: { children: React.ReactNode }) => {
                     pedido_id,
                 }));
 
-            // Para cada pedido confirmado, obtener mesa y platos igual que con el websocket
+            // En preparación (estado_actual === 0)
+            const pedidosEnPreparacion = Object.entries(data.pedidos)
+                .filter(([_, pedido]: any) => pedido.estados?.estado_actual === "preparacion")
+                .map(([pedido_id, pedido]: any) => ({
+                    ...pedido,
+                    pedido_id,
+                }));
+
+            // Cards confirmados
             const pedidosCards = await Promise.all(
                 pedidosConfirmados.map(async (pedido: any) => {
-                    // Fetch mesa
                     const mesaRes = await fetch(
-                        `http://127.0.0.1:8000/mesa?user_id=${user_id}&restaurante_id=${restaurante_id}&mesa_id=${pedido.mesa_id}`
+                        `${Config.API_URL}/mesa/?user_id=${user_id}&restaurante_id=${restaurante_id}&mesa_id=${pedido.mesa_id}`
                     );
                     const mesaData = await mesaRes.json();
-
-                    // Fetch platos
                     const platosObj: Record<string, { cantidad: number }> = pedido.platos;
                     const platosArr = await Promise.all(
                         Object.entries(platosObj).map(async ([platoId, { cantidad }]) => {
                             const platoRes = await fetch(
-                                `http://127.0.0.1:8000/plato?user_id=${user_id}&restaurante_id=${restaurante_id}&plato_id=${platoId}`
+                                `${Config.API_URL}/plato/?user_id=${user_id}&restaurante_id=${restaurante_id}&plato_id=${platoId}`
                             );
                             const platoData = await platoRes.json();
                             return { nombre: platoData.nombre, cantidad };
                         })
                     );
+                    return {
+                        pedido_id: pedido.pedido_id,
+                        mesa_numero: mesaData.numero,
+                        platos: platosArr,
+                    };
+                })
+            );
 
+            // Cards en preparación
+            const pedidosPreparacionCards = await Promise.all(
+                pedidosEnPreparacion.map(async (pedido: any) => {
+                    const mesaRes = await fetch(
+                        `${Config.API_URL}/mesa/?user_id=${user_id}&restaurante_id=${restaurante_id}&mesa_id=${pedido.mesa_id}`
+                    );
+                    const mesaData = await mesaRes.json();
+                    const platosObj: Record<string, { cantidad: number }> = pedido.platos;
+                    const platosArr = await Promise.all(
+                        Object.entries(platosObj).map(async ([platoId, { cantidad }]) => {
+                            const platoRes = await fetch(
+                                `${Config.API_URL}/plato/?user_id=${user_id}&restaurante_id=${restaurante_id}&plato_id=${platoId}`
+                            );
+                            const platoData = await platoRes.json();
+                            return { nombre: platoData.nombre, cantidad };
+                        })
+                    );
                     return {
                         pedido_id: pedido.pedido_id,
                         mesa_numero: mesaData.numero,
@@ -67,9 +112,16 @@ const CocinaLayout = ({ children }: { children: React.ReactNode }) => {
             );
 
             setPedidos(pedidosCards);
+            setPedidosPreparacion(pedidosPreparacionCards);
+            } catch (error) {
+                console.error("Error al obtener pedidos:", error);
+                Swal.fire('Error', 'No se pudieron cargar los pedidos.', 'error');   
+            }finally {
+                setIsSubmitting(false);
+            }
         };
 
-        fetchPedidosConfirmados();
+        fetchPedidos();
     }, []);
 
     // WebSocket para nuevos pedidos
@@ -83,7 +135,7 @@ const CocinaLayout = ({ children }: { children: React.ReactNode }) => {
                 const restaurante_id = trabajador.restaurante_id;
                 if (!user_id || !restaurante_id) return;
 
-                ws.current = new WebSocket(`ws://localhost:8000/ws/kitchen/${user_id}/${restaurante_id}`);
+                ws.current = new WebSocket(`${Config.API_URL_WS}/ws/kitchen/${user_id}/${restaurante_id}`);
 
                 ws.current.onopen = () => {
                     console.log("WebSocket conectado");
@@ -106,7 +158,7 @@ const CocinaLayout = ({ children }: { children: React.ReactNode }) => {
 
                             // Fetch número de mesa
                             const mesaRes = await fetch(
-                                `http://127.0.0.1:8000/mesa?user_id=${user_id}&restaurante_id=${restaurante_id}&mesa_id=${mesa_id}`
+                                `${Config.API_URL}/mesa/?user_id=${user_id}&restaurante_id=${restaurante_id}&mesa_id=${mesa_id}`
                             );
                             const mesaData = await mesaRes.json();
 
@@ -114,7 +166,7 @@ const CocinaLayout = ({ children }: { children: React.ReactNode }) => {
                             const platosArr = await Promise.all(
                                 Object.entries(platosObj).map(async ([platoId, { cantidad }]) => {
                                     const platoRes = await fetch(
-                                        `http://127.0.0.1:8000/plato?user_id=${user_id}&restaurante_id=${restaurante_id}&plato_id=${platoId}`
+                                        `${Config.API_URL}/plato/?user_id=${user_id}&restaurante_id=${restaurante_id}&plato_id=${platoId}`
                                     );
                                     const platoData = await platoRes.json();
                                     return { nombre: platoData.nombre, cantidad };
@@ -157,36 +209,116 @@ const CocinaLayout = ({ children }: { children: React.ReactNode }) => {
         };
     }, []);
 
+    const handleMarcarComoListo = async (pedido_id: string) => {
+        const result = await Swal.fire({
+            title: '¿Marcar como listo?',
+            text: '¿Estás seguro de cambiar el estado a "en preparación"?',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, confirmar',
+            cancelButtonText: 'Cancelar',
+        });
+
+        if (result.isConfirmed) {
+            try {
+                const trabajadorStr = await AsyncStorage.getItem("trabajador");
+                if (!trabajadorStr) return;
+                const trabajador = JSON.parse(trabajadorStr);
+                const user_id = trabajador.user_id;
+                const restaurante_id = trabajador.restaurante_id;
+
+                const response = await fetch(
+                    `${Config.API_URL}/pedido`,
+                    {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            pedido_id,
+                            user_id,
+                            restaurante_id,
+                            estado_actual: 1
+                        })
+                    }
+                );
+                if (response.ok) {
+                    // Encuentra el pedido actualizado
+                    const pedidoActualizado = pedidos.find(p => p.pedido_id === pedido_id);
+                    // Elimínalo de la lista de confirmados
+                    setPedidos(prev => prev.filter(p => p.pedido_id !== pedido_id));
+                    // Agrégalo a la lista de preparación si existe
+                    if (pedidoActualizado) {
+                        setPedidosPreparacion(prev => [
+                            pedidoActualizado,
+                            ...prev,
+                        ]);
+                    }
+                }
+            } catch (e) {
+                Swal.fire('Error', 'No se pudo actualizar el pedido.', 'error');
+            }
+        }
+    };
     const childrenArray = React.Children.toArray(children);
+    if (isSubmitting) {
+        return <LoadingScreen message="Cargando pedidos"/>;
+    }
     return (
-        <View className="flex-1 flex-row bg-neutral-100">
+        <View style={{ flex: 1, flexDirection: 'row', backgroundColor: Colors.bg_light }}>
+            {/* Columna izquierda: pedidos confirmados */}
             <View className="flex-1 p-4">
-                {pedidos.map((pedido) => (
-                    <View key={pedido.pedido_id} className="bg-white rounded-lg shadow p-4 mb-4">
-                        <Text className="font-bold text-lg mb-2">Pedido #{pedido.pedido_id}</Text>
-                        <Text className="mb-1">Mesa: {pedido.mesa_numero}</Text>
-                        <Text className="font-semibold">Platos:</Text>
-                        {pedido.platos.map((plato, idx) => (
-                            <Text key={idx}>
-                                {plato.nombre} x {plato.cantidad}
-                            </Text>
-                        ))}
-                        <TouchableOpacity
-                            className="mt-2 bg-blue-500 text-white text-center py-2 rounded"
-                            onPress={() => {
-                                // Aquí puedes manejar la acción de marcar el pedido como listo
-                                console.log(`Pedido ${pedido.pedido_id} marcado como listo`);
+                <ScrollView>
+                    {pedidos.map((pedido) => (
+                        <View
+                            key={pedido.pedido_id}
+                            style={{
+                                backgroundColor: Colors.primary,
+                                borderRadius: 8,
+                                padding: 16,
+                                marginBottom: 16,
                             }}
                         >
-                            <Text className="text-white text-center">Marcar como listo</Text>
-                        </TouchableOpacity>
-                    </View>
-                ))}
+                            
+                            <Text className="font-bold text-lg mb-2 text-white">Pedido #{pedido.pedido_id}</Text>
+                            <Text className="mb-1 text-white">Mesa: {pedido.mesa_numero}</Text>
+                            
+                            <Text className="font-semibold text-white">Platos:</Text>
+                            {pedido.platos.map((plato, idx) => (
+                                <Text key={idx} className="text-white">
+                                    
+                                    {plato.nombre} x {plato.cantidad} und.
+                                </Text>
+                            ))}
+                            <TouchableOpacity
+                                className="mt-2 bg-blue-500 text-white text-center py-2 rounded"
+                                onPress={() => handleMarcarComoListo(pedido.pedido_id)}
+                            >
+                                <Text className="text-white text-center">Aceptar pedido</Text>
+                            </TouchableOpacity>
+                        </View>
+                    ))}
+                </ScrollView>
                 {childrenArray[0]}
             </View>
+            {/* Columna central: pedidos en preparación */}
             <View className="flex-1 p-4 border-x border-neutral-300">
+                <ScrollView>
+                    {pedidosPreparacion.map((pedido) => (
+                        <View key={pedido.pedido_id} className="rounded-lg shadow p-4 mb-4" style={{ backgroundColor: Colors.primary }}>
+                            <Text className="font-bold text-lg mb-2 text-white">Pedido #{pedido.pedido_id}</Text>
+                            <Text className="mb-1 text-white">Mesa: {pedido.mesa_numero}</Text>
+                            <Text className="font-semibold text-white">Platos:</Text>
+                            {pedido.platos.map((plato, idx) => (
+                                <Text key={idx} className="text-white">
+                                    {plato.nombre} x {plato.cantidad}
+                                </Text>
+                            ))}
+                            {/* Puedes agregar más acciones aquí si lo deseas */}
+                        </View>
+                    ))}
+                </ScrollView>
                 {childrenArray[1]}
             </View>
+            {/* Columna derecha */}
             <View className="flex-1 p-4">
                 {childrenArray[2]}
             </View>
