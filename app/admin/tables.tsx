@@ -23,6 +23,13 @@ export default function MesaTable() {
 
     const tablePosition = useRef(new Animated.Value(0)).current;
     const formOpacity = useRef(new Animated.Value(0)).current;
+    interface Silla {
+        numero: number;
+        mesa_id: string;
+    }
+    interface SillasResponse {
+        sillas: { [id: string]: Silla };
+    }
 
     const fetchMesas = async () => {
         setLoading(true);
@@ -77,13 +84,14 @@ export default function MesaTable() {
         });
     };
 
-    const handleSubmit = async () => {
+    const handleSubmitMesa = async () => {
         setIsSubmitting(true);
         try {
             const userId = await AsyncStorage.getItem('userId');
             const restauranteId = await AsyncStorage.getItem('restaurantId');
             if (!selectedMesaId) return;
 
+            //Actualizar la mesa
             await fetch(`${Config.API_URL}/mesa/`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
@@ -94,6 +102,52 @@ export default function MesaTable() {
                 ...formValues,
                 }),
             });
+
+            //Obtener sillas actuales de la mesa
+            const res = await fetch(`${Config.API_URL}/silla/silla_mesa/?user_id=${userId}&restaurante_id=${restauranteId}&mesa_id=${selectedMesaId}`);
+            const data: SillasResponse = await res.json();
+            const sillasActuales = Object.entries(data.sillas || {}).map(([id, silla]) => ({
+                id,
+                numero: silla.numero,
+                mesa_id: silla.mesa_id,
+                }));
+
+            const cantidadActual = sillasActuales.length;
+            const nuevaCantidad = formValues.capacidad;
+
+            //Crear sillas si faltan
+            if (nuevaCantidad > cantidadActual) {
+                const sillasPorCrear = nuevaCantidad - cantidadActual;
+                for (let i = 0; i < sillasPorCrear; i++) {
+                    const numeroSilla = i + 1;
+                    await fetch(`${Config.API_URL}/silla/`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            user_id: userId,
+                            restaurante_id: restauranteId,
+                            mesa_id: selectedMesaId,
+                            numero: cantidadActual + numeroSilla,
+                        }),
+                    });
+                }
+            }
+
+            //Eliminar sillas si sobran 
+            if (nuevaCantidad < cantidadActual) {
+                const sillasPorEliminar = sillasActuales.slice().sort((a, b) => b.numero - a.numero).slice(0, cantidadActual - nuevaCantidad);
+                for (const silla of sillasPorEliminar) {
+                    await fetch(`${Config.API_URL}/silla/`, {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            user_id: userId,
+                            restaurante_id: restauranteId,
+                            silla_id: silla.id,
+                        }),
+                    });
+                }
+            }
 
             await fetchMesas();
             handleCancel();
@@ -180,7 +234,7 @@ export default function MesaTable() {
                         <Pressable style={[styles.button, { backgroundColor: 'gray' }]} onPress={handleCancel}>
                             <BoldText style={styles.textButton}>Cancelar</BoldText>
                         </Pressable>
-                        <Pressable style={styles.button} onPress={handleSubmit}>
+                        <Pressable style={styles.button} onPress={handleSubmitMesa}>
                             <BoldText style={styles.textButton}>Guardar</BoldText>
                         </Pressable>
                         </View>
