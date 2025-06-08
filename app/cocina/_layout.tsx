@@ -14,6 +14,7 @@ const CocinaLayout = ({ children }: { children: React.ReactNode }) => {
             pedido_id: string;
             mesa_numero: number | string;
             platos: { nombre: string; cantidad: number }[];
+            detalle: string; // Detalle opcional
         }[]
     >([]);
 
@@ -22,6 +23,7 @@ const CocinaLayout = ({ children }: { children: React.ReactNode }) => {
         pedido_id: string;
         mesa_numero: number | string;
         platos: { nombre: string; cantidad: number }[];
+        detalle: string; // Detalle opcional
     }[]
 >([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -38,85 +40,58 @@ const CocinaLayout = ({ children }: { children: React.ReactNode }) => {
 
             setIsSubmitting(true);
             try {
-                
-            
-            const response = await fetch(
-                `${Config.API_URL}/pedidos/?user_id=${user_id}&restaurante_id=${restaurante_id}`
-            );
-            const data = await response.json();
+                // 1. Obtener todos los pedidos (solo IDs)
+                const response = await fetch(
+                    `${Config.API_URL_LOCAL}/pedidos/?user_id=${user_id}&restaurante_id=${restaurante_id}`
+                );
+                const data = await response.json();
+                const pedidoIds = Object.keys(data.pedidos);
 
-            // Confirmados
-            const pedidosConfirmados = Object.entries(data.pedidos)
-                .filter(([_, pedido]: any) => pedido.estados?.estado_actual === "confirmado")
-                .map(([pedido_id, pedido]: any) => ({
-                    ...pedido,
-                    pedido_id,
-                }));
-
-            // En preparación (estado_actual === 0)
-            const pedidosEnPreparacion = Object.entries(data.pedidos)
-                .filter(([_, pedido]: any) => pedido.estados?.estado_actual === "preparacion")
-                .map(([pedido_id, pedido]: any) => ({
-                    ...pedido,
-                    pedido_id,
-                }));
-
-            // Cards confirmados
-            const pedidosCards = await Promise.all(
-                pedidosConfirmados.map(async (pedido: any) => {
-                    const mesaRes = await fetch(
-                        `${Config.API_URL}/mesa/?user_id=${user_id}&restaurante_id=${restaurante_id}&mesa_id=${pedido.mesa_id}`
-                    );
-                    const mesaData = await mesaRes.json();
-                    const platosObj: Record<string, { cantidad: number }> = pedido.platos;
-                    const platosArr = await Promise.all(
-                        Object.entries(platosObj).map(async ([platoId, { cantidad }]) => {
-                            const platoRes = await fetch(
-                                `${Config.API_URL}/plato/?user_id=${user_id}&restaurante_id=${restaurante_id}&plato_id=${platoId}`
+                // 2. Agrega cada card básica apenas llega el ID
+                pedidoIds.forEach((pedido_id) => {
+                    setPedidos(prev => [
+                        ...prev,
+                        {
+                            pedido_id,
+                            mesa_numero: 'Cargando...',
+                            platos: [],
+                            estado_actual: 'cargando',
+                            detalle: 'Cargando...' 
+                        }
+                    ]);
+                    // 3. Obtén detalles y actualiza la card al llegar
+                    (async () => {
+                        try {
+                            const detalleRes = await fetch(
+                                `${Config.API_URL_LOCAL}/pedido/detalle?user_id=${user_id}&restaurante_id=${restaurante_id}&pedido_id=${pedido_id}`
                             );
-                            const platoData = await platoRes.json();
-                            return { nombre: platoData.nombre, cantidad };
-                        })
-                    );
-                    return {
-                        pedido_id: pedido.pedido_id,
-                        mesa_numero: mesaData.numero,
-                        platos: platosArr,
-                    };
-                })
-            );
-
-            // Cards en preparación
-            const pedidosPreparacionCards = await Promise.all(
-                pedidosEnPreparacion.map(async (pedido: any) => {
-                    const mesaRes = await fetch(
-                        `${Config.API_URL}/mesa/?user_id=${user_id}&restaurante_id=${restaurante_id}&mesa_id=${pedido.mesa_id}`
-                    );
-                    const mesaData = await mesaRes.json();
-                    const platosObj: Record<string, { cantidad: number }> = pedido.platos;
-                    const platosArr = await Promise.all(
-                        Object.entries(platosObj).map(async ([platoId, { cantidad }]) => {
-                            const platoRes = await fetch(
-                                `${Config.API_URL}/plato/?user_id=${user_id}&restaurante_id=${restaurante_id}&plato_id=${platoId}`
+                            const detalleData = await detalleRes.json();
+                            const detalle = detalleData.pedido_detalle;
+                            if (!detalle) return;
+                            const pedidoActualizado = {
+                                pedido_id,
+                                mesa_numero: detalle.mesa,
+                                platos: Object.entries(detalle.platos).map(([nombre, cantidad]) => ({
+                                    nombre,
+                                    cantidad: Number(cantidad),
+                                })),
+                                estado_actual: detalle.estado_actual,
+                                detalle: detalle.detalle, 
+                            };
+                            setPedidos(prev =>
+                                prev.map(p =>
+                                    p.pedido_id === pedido_id ? pedidoActualizado : p
+                                )
                             );
-                            const platoData = await platoRes.json();
-                            return { nombre: platoData.nombre, cantidad };
-                        })
-                    );
-                    return {
-                        pedido_id: pedido.pedido_id,
-                        mesa_numero: mesaData.numero,
-                        platos: platosArr,
-                    };
-                })
-            );
-
-            setPedidos(pedidosCards);
-            setPedidosPreparacion(pedidosPreparacionCards);
+                        } catch (e) {
+                            // Manejo de error opcional
+                        }
+                    })();
+                });
             } catch (error) {
                 console.error("Error al obtener pedidos:", error);
-                Swal.fire('Error', 'No se pudieron cargar los pedidos.', 'error');   
-            }finally {
+                Swal.fire('Error', 'No se pudieron cargar los pedidos.', 'error');
+            } finally {
                 setIsSubmitting(false);
             }
         };
@@ -135,7 +110,7 @@ const CocinaLayout = ({ children }: { children: React.ReactNode }) => {
                 const restaurante_id = trabajador.restaurante_id;
                 if (!user_id || !restaurante_id) return;
 
-                ws.current = new WebSocket(`${Config.API_URL_WS}/ws/kitchen/${user_id}/${restaurante_id}`);
+                ws.current = new WebSocket(`${Config.API_URL_LOCAL_WS}/ws/kitchen/${user_id}/${restaurante_id}`);
 
                 ws.current.onopen = () => {
                     console.log("WebSocket conectado");
@@ -158,7 +133,7 @@ const CocinaLayout = ({ children }: { children: React.ReactNode }) => {
 
                             // Fetch número de mesa
                             const mesaRes = await fetch(
-                                `${Config.API_URL}/mesa/?user_id=${user_id}&restaurante_id=${restaurante_id}&mesa_id=${mesa_id}`
+                                `${Config.API_URL_LOCAL}/mesa/?user_id=${user_id}&restaurante_id=${restaurante_id}&mesa_id=${mesa_id}`
                             );
                             const mesaData = await mesaRes.json();
 
@@ -166,98 +141,99 @@ const CocinaLayout = ({ children }: { children: React.ReactNode }) => {
                             const platosArr = await Promise.all(
                                 Object.entries(platosObj).map(async ([platoId, { cantidad }]) => {
                                     const platoRes = await fetch(
-                                        `${Config.API_URL}/plato/?user_id=${user_id}&restaurante_id=${restaurante_id}&plato_id=${platoId}`
+                                        `${Config.API_URL_LOCAL}/plato/?user_id=${user_id}&restaurante_id=${restaurante_id}&plato_id=${platoId}`
                                     );
                                     const platoData = await platoRes.json();
                                     return { nombre: platoData.nombre, cantidad };
-                                })
-                            );
+                            })
+                        );
 
-                            // Aquí puedes actualizar el estado para mostrar la card
-                            setPedidos(prev => [
-                                {
-                                    pedido_id: data.pedido_id,
-                                    mesa_numero: mesaData.numero,
-                                    platos: platosArr,
-                                },
-                                ...prev,
-                            ]);
-                        }
-                    } catch (err) {
-                        console.log("Error procesando mensaje:", err);
-                    }
-                };
-
-                ws.current.onerror = (error) => {
-                    console.log("WebSocket error:", error);
-                };
-
-                ws.current.onclose = () => {
-                    console.log("WebSocket cerrado");
-                };
-            } catch (e) {
-                console.log("Error al conectar WebSocket:", e);
-            }
-        };
-
-        connectWebSocket();
-
-        return () => {
-            if (ws.current) {
-                ws.current.close();
-            }
-        };
-    }, []);
-
-    const handleMarcarComoListo = async (pedido_id: string) => {
-        const result = await Swal.fire({
-            title: '¿Marcar como listo?',
-            text: '¿Estás seguro de cambiar el estado a "en preparación"?',
-            icon: 'question',
-            showCancelButton: true,
-            confirmButtonText: 'Sí, confirmar',
-            cancelButtonText: 'Cancelar',
-        });
-
-        if (result.isConfirmed) {
-            try {
-                const trabajadorStr = await AsyncStorage.getItem("trabajador");
-                if (!trabajadorStr) return;
-                const trabajador = JSON.parse(trabajadorStr);
-                const user_id = trabajador.user_id;
-                const restaurante_id = trabajador.restaurante_id;
-
-                const response = await fetch(
-                    `${Config.API_URL}/pedido`,
-                    {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            pedido_id,
-                            user_id,
-                            restaurante_id,
-                            estado_actual: 1
-                        })
-                    }
-                );
-                if (response.ok) {
-                    // Encuentra el pedido actualizado
-                    const pedidoActualizado = pedidos.find(p => p.pedido_id === pedido_id);
-                    // Elimínalo de la lista de confirmados
-                    setPedidos(prev => prev.filter(p => p.pedido_id !== pedido_id));
-                    // Agrégalo a la lista de preparación si existe
-                    if (pedidoActualizado) {
-                        setPedidosPreparacion(prev => [
-                            pedidoActualizado,
+                        // Aquí puedes actualizar el estado para mostrar la card
+                        setPedidos(prev => [
+                            {
+                                pedido_id: data.pedido_id,
+                                mesa_numero: mesaData.numero,
+                                platos: platosArr,
+                                detalle: '', // O puedes poner algún valor por defecto o extraerlo de data.pedido si existe
+                            },
                             ...prev,
                         ]);
                     }
+                } catch (err) {
+                    console.log("Error procesando mensaje:", err);
                 }
-            } catch (e) {
-                Swal.fire('Error', 'No se pudo actualizar el pedido.', 'error');
-            }
+            };
+
+            ws.current.onerror = (error) => {
+                console.log("WebSocket error:", error);
+            };
+
+            ws.current.onclose = () => {
+                console.log("WebSocket cerrado");
+            };
+        } catch (e) {
+            console.log("Error al conectar WebSocket:", e);
         }
     };
+
+    connectWebSocket();
+
+    return () => {
+        if (ws.current) {
+            ws.current.close();
+        }
+    };
+}, []);
+
+const handleMarcarComoListo = async (pedido_id: string) => {
+    const result = await Swal.fire({
+        title: '¿Marcar como listo?',
+        text: '¿Estás seguro de cambiar el estado a "en preparación"?',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, confirmar',
+        cancelButtonText: 'Cancelar',
+    });
+
+    if (result.isConfirmed) {
+        try {
+            const trabajadorStr = await AsyncStorage.getItem("trabajador");
+            if (!trabajadorStr) return;
+            const trabajador = JSON.parse(trabajadorStr);
+            const user_id = trabajador.user_id;
+            const restaurante_id = trabajador.restaurante_id;
+
+            const response = await fetch(
+                `${Config.API_URL_LOCAL}/pedido`,
+                {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        pedido_id,
+                        user_id,
+                        restaurante_id,
+                        estado_actual: 1
+                    })
+                }
+            );
+            if (response.ok) {
+                // Encuentra el pedido actualizado
+                const pedidoActualizado = pedidos.find(p => p.pedido_id === pedido_id);
+                // Elimínalo de la lista de confirmados
+                setPedidos(prev => prev.filter(p => p.pedido_id !== pedido_id));
+                // Agrégalo a la lista de preparación si existe
+                if (pedidoActualizado) {
+                    setPedidosPreparacion(prev => [
+                        pedidoActualizado,
+                        ...prev,
+                    ]);
+                }
+            }
+        } catch (e) {
+            Swal.fire('Error', 'No se pudo actualizar el pedido.', 'error');
+        }
+    }
+};
     const childrenArray = React.Children.toArray(children);
     if (isSubmitting) {
         return <LoadingScreen message="Cargando pedidos"/>;
@@ -279,8 +255,8 @@ const CocinaLayout = ({ children }: { children: React.ReactNode }) => {
                         >
                             
                             <Text className="font-bold text-lg mb-2 text-white">Pedido #{pedido.pedido_id}</Text>
-                            <Text className="mb-1 text-white">Mesa: {pedido.mesa_numero}</Text>
-                            
+                            <Text className="font-bold mb-1 text-white">Mesa: {pedido.mesa_numero}</Text>
+                            <Text className="font-bold text-white">Detalle: {pedido.detalle}</Text>
                             <Text className="font-semibold text-white">Platos:</Text>
                             {pedido.platos.map((plato, idx) => (
                                 <Text key={idx} className="text-white">
@@ -305,7 +281,8 @@ const CocinaLayout = ({ children }: { children: React.ReactNode }) => {
                     {pedidosPreparacion.map((pedido) => (
                         <View key={pedido.pedido_id} className="rounded-lg shadow p-4 mb-4" style={{ backgroundColor: Colors.primary }}>
                             <Text className="font-bold text-lg mb-2 text-white">Pedido #{pedido.pedido_id}</Text>
-                            <Text className="mb-1 text-white">Mesa: {pedido.mesa_numero}</Text>
+                            <Text className="font-bold mb-1 text-white">Mesa: {pedido.mesa_numero}</Text>
+                            <Text className="font-bold text-white">Detalle: {pedido.detalle}</Text>
                             <Text className="font-semibold text-white">Platos:</Text>
                             {pedido.platos.map((plato, idx) => (
                                 <Text key={idx} className="text-white">
