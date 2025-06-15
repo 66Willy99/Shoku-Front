@@ -8,7 +8,9 @@ import LoadingScreen from '@/components/ui/LoadingScreen';
 
 const CocinaLayout = ({ children }: { children: React.ReactNode }) => {
     const ws = useRef<WebSocket | null>(null);
-
+    const APIURL = Config.API_URL_LOCAL; //Usa Config.API_URL_LOCAL para desarrollo local o Config.API_URL para producción
+    const APIURLWS = Config.API_URL_LOCAL_WS;  //Usa Config.API_URL_LOCAL_WS para desarrollo local o Config.API_URL_WS_PROD para producción
+    
     const [pedidos, setPedidos] = useState<
         {
             pedido_id: string;
@@ -42,7 +44,7 @@ const CocinaLayout = ({ children }: { children: React.ReactNode }) => {
             try {
                 // 1. Obtener todos los pedidos (solo IDs)
                 const response = await fetch(
-                    `${Config.API_URL_LOCAL}/pedidos/?user_id=${user_id}&restaurante_id=${restaurante_id}`
+                    `${APIURL}/pedidos/?user_id=${user_id}&restaurante_id=${restaurante_id}`
                 );
                 const data = await response.json();
                 const pedidoIds = Object.keys(data.pedidos);
@@ -63,7 +65,7 @@ const CocinaLayout = ({ children }: { children: React.ReactNode }) => {
                     (async () => {
                         try {
                             const detalleRes = await fetch(
-                                `${Config.API_URL_LOCAL}/pedido/detalle?user_id=${user_id}&restaurante_id=${restaurante_id}&pedido_id=${pedido_id}`
+                                `${APIURL}/pedido/detalle?user_id=${user_id}&restaurante_id=${restaurante_id}&pedido_id=${pedido_id}`
                             );
                             const detalleData = await detalleRes.json();
                             const detalle = detalleData.pedido_detalle;
@@ -110,7 +112,7 @@ const CocinaLayout = ({ children }: { children: React.ReactNode }) => {
                 const restaurante_id = trabajador.restaurante_id;
                 if (!user_id || !restaurante_id) return;
 
-                ws.current = new WebSocket(`${Config.API_URL_LOCAL_WS}/ws/kitchen/${user_id}/${restaurante_id}`);
+                ws.current = new WebSocket(`${APIURLWS}/ws/kitchen/${user_id}/${restaurante_id}`);
 
                 ws.current.onopen = () => {
                     console.log("WebSocket conectado");
@@ -119,6 +121,7 @@ const CocinaLayout = ({ children }: { children: React.ReactNode }) => {
                 ws.current.onmessage = async (event) => {
                     try {
                         const data = JSON.parse(event.data);
+                        console.log(data);
                         if (data.evento === "nuevo_pedido") {
                             // Obtén datos del localStorage
                             const trabajadorStr = localStorage.getItem("trabajador");
@@ -127,113 +130,101 @@ const CocinaLayout = ({ children }: { children: React.ReactNode }) => {
                             const user_id = trabajador.user_id;
                             const restaurante_id = trabajador.restaurante_id;
 
-                            // Obtén mesa y platos usando los IDs del mensaje
-                            const mesa_id = data.pedido.mesa_id;
-                            const platosObj: Record<string, { cantidad: number }> = data.pedido.platos;
-
-                            // Fetch número de mesa
-                            const mesaRes = await fetch(
-                                `${Config.API_URL_LOCAL}/mesa/?user_id=${user_id}&restaurante_id=${restaurante_id}&mesa_id=${mesa_id}`
+                            // Fetch detalle del pedido
+                            const dataPedido = await fetch(
+                                `${APIURL}/pedido/detalle?user_id=${user_id}&restaurante_id=${restaurante_id}&pedido_id=${data.pedido_id}`
                             );
-                            const mesaData = await mesaRes.json();
+                            const Pedido = await dataPedido.json();
+                            const detalle = Pedido.pedido_detalle;
 
-                            // Fetch nombres de platos
-                            const platosArr = await Promise.all(
-                                Object.entries(platosObj).map(async ([platoId, { cantidad }]) => {
-                                    const platoRes = await fetch(
-                                        `${Config.API_URL_LOCAL}/plato/?user_id=${user_id}&restaurante_id=${restaurante_id}&plato_id=${platoId}`
-                                    );
-                                    const platoData = await platoRes.json();
-                                    return { nombre: platoData.nombre, cantidad };
-                            })
-                        );
+                            setPedidos(prev => [
+                                {
+                                    pedido_id: data.pedido_id,
+                                    mesa_numero: detalle.mesa,
+                                    platos: Object.entries(detalle.platos).map(([nombre, cantidad]) => ({
+                                        nombre,
+                                        cantidad: Number(cantidad),
+                                    })),
+                                    detalle: detalle.detalle || '', // Aquí se setea el detalle del pedido
+                                },
+                                ...prev,
+                            ]);
+                        }
+                    } catch (err) {
+                        console.log("Error procesando mensaje:", err);
+                    }
+                };
 
-                        // Aquí puedes actualizar el estado para mostrar la card
-                        setPedidos(prev => [
-                            {
-                                pedido_id: data.pedido_id,
-                                mesa_numero: mesaData.numero,
-                                platos: platosArr,
-                                detalle: '', // O puedes poner algún valor por defecto o extraerlo de data.pedido si existe
-                            },
+                ws.current.onerror = (error) => {
+                    console.log("WebSocket error:", error);
+                };
+
+                ws.current.onclose = () => {
+                    console.log("WebSocket cerrado");
+                };
+            } catch (e) {
+                console.log("Error al conectar WebSocket:", e);
+            }
+        };
+
+        connectWebSocket();
+
+        return () => {
+            if (ws.current) {
+                ws.current.close();
+            }
+        };
+    }, []);
+
+    const handleMarcarComoListo = async (pedido_id: string) => {
+        const result = await Swal.fire({
+            title: '¿Marcar como listo?',
+            text: '¿Estás seguro de cambiar el estado a "en preparación"?',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, confirmar',
+            cancelButtonText: 'Cancelar',
+        });
+
+        if (result.isConfirmed) {
+            try {
+                const trabajadorStr = await AsyncStorage.getItem("trabajador");
+                if (!trabajadorStr) return;
+                const trabajador = JSON.parse(trabajadorStr);
+                const user_id = trabajador.user_id;
+                const restaurante_id = trabajador.restaurante_id;
+
+                const response = await fetch(
+                    `${APIURL}/pedido`,
+                    {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            pedido_id,
+                            user_id,
+                            restaurante_id,
+                            estado_actual: 1
+                        })
+                    }
+                );
+                if (response.ok) {
+                    // Encuentra el pedido actualizado
+                    const pedidoActualizado = pedidos.find(p => p.pedido_id === pedido_id);
+                    // Elimínalo de la lista de confirmados
+                    setPedidos(prev => prev.filter(p => p.pedido_id !== pedido_id));
+                    // Agrégalo a la lista de preparación si existe
+                    if (pedidoActualizado) {
+                        setPedidosPreparacion(prev => [
+                            pedidoActualizado,
                             ...prev,
                         ]);
                     }
-                } catch (err) {
-                    console.log("Error procesando mensaje:", err);
                 }
-            };
-
-            ws.current.onerror = (error) => {
-                console.log("WebSocket error:", error);
-            };
-
-            ws.current.onclose = () => {
-                console.log("WebSocket cerrado");
-            };
-        } catch (e) {
-            console.log("Error al conectar WebSocket:", e);
-        }
-    };
-
-    connectWebSocket();
-
-    return () => {
-        if (ws.current) {
-            ws.current.close();
-        }
-    };
-}, []);
-
-const handleMarcarComoListo = async (pedido_id: string) => {
-    const result = await Swal.fire({
-        title: '¿Marcar como listo?',
-        text: '¿Estás seguro de cambiar el estado a "en preparación"?',
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonText: 'Sí, confirmar',
-        cancelButtonText: 'Cancelar',
-    });
-
-    if (result.isConfirmed) {
-        try {
-            const trabajadorStr = await AsyncStorage.getItem("trabajador");
-            if (!trabajadorStr) return;
-            const trabajador = JSON.parse(trabajadorStr);
-            const user_id = trabajador.user_id;
-            const restaurante_id = trabajador.restaurante_id;
-
-            const response = await fetch(
-                `${Config.API_URL_LOCAL}/pedido`,
-                {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        pedido_id,
-                        user_id,
-                        restaurante_id,
-                        estado_actual: 1
-                    })
-                }
-            );
-            if (response.ok) {
-                // Encuentra el pedido actualizado
-                const pedidoActualizado = pedidos.find(p => p.pedido_id === pedido_id);
-                // Elimínalo de la lista de confirmados
-                setPedidos(prev => prev.filter(p => p.pedido_id !== pedido_id));
-                // Agrégalo a la lista de preparación si existe
-                if (pedidoActualizado) {
-                    setPedidosPreparacion(prev => [
-                        pedidoActualizado,
-                        ...prev,
-                    ]);
-                }
+            } catch (e) {
+                Swal.fire('Error', 'No se pudo actualizar el pedido.', 'error');
             }
-        } catch (e) {
-            Swal.fire('Error', 'No se pudo actualizar el pedido.', 'error');
         }
-    }
-};
+    };
     const childrenArray = React.Children.toArray(children);
     if (isSubmitting) {
         return <LoadingScreen message="Cargando pedidos"/>;
