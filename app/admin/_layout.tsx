@@ -35,6 +35,15 @@ export default function AdminLayout() {
         checkRestaurants();
     }, [loading]);
 
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            document.body.style.overflow = 'visible';
+            document.body.style.position = 'static';
+            document.documentElement.style.overflow = 'visible';
+            document.documentElement.style.position = 'static';
+        }
+    }, []);
+
     
     const isOnLoginPage = segments.join('/') === 'admin' || segments.join('/') === 'admin/index';
 
@@ -58,7 +67,7 @@ export default function AdminLayout() {
     }
 
     return (
-        <View style={{ flex: 1, backgroundColor: Colors.bg_light }}>
+        <View style={{ flex: 1, backgroundColor: Colors.bg_light, position: 'relative', overflow: 'visible', zIndex: 0 }}> 
         <CustomHeader excludeRoutes={['/admin']} />
         <Stack
             screenOptions={{
