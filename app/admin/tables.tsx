@@ -40,16 +40,17 @@ export default function MesaTable() {
     useSweetAlertWatcher(
         () => {
             setShowTable(false);
-            setShowForm(false); // Oculta el formulario si está visible
+            setShowForm(false); 
         },
         () => {
             setTimeout(() => {
             setShowTable(true);
-            setShowForm(true); // Vuelve a mostrar si era necesario
+            setShowForm(true); 
             }, 150);
         }
     );
 
+    //region Obtener mesas
     const fetchMesas = async () => {
         setLoading(true);
         try {
@@ -66,6 +67,10 @@ export default function MesaTable() {
         }
     };
 
+    const noHayMesas = Object.keys(mesas).length === 0;
+    //endregion Obtener mesas
+
+    //region Animaciones de tabla
     const handleEdit = (id: string) => {
         const mesa = mesas[id];
         setSelectedMesaId(id);
@@ -84,7 +89,9 @@ export default function MesaTable() {
             }),
         ]).start();
     };
+    //endregion Animacion de tabla
 
+    //region Restablecer animaciones
     const handleCancel = () => {
         Animated.parallel([
             Animated.timing(tableMargin, {
@@ -103,8 +110,11 @@ export default function MesaTable() {
             setIsCreating(false);
         });
     };
+    //endregion Restablecer animaciones
 
+    //region Editar o crear mesa
     const handleSubmitMesa = async () => {
+        //region Validaciones del formulario
         if (!formValues.numero || !formValues.capacidad || !formValues.estado) {
             Swal.fire({
                 title: 'Campos incompletos',
@@ -135,14 +145,17 @@ export default function MesaTable() {
             setIsSubmitting(false);
             return;
         }
+        //endregion Validaciones del formulario
+
+        //region Manejo de datos
         setIsSubmitting(true);
         try {
             const userId = await AsyncStorage.getItem('userId');
             const restauranteId = await AsyncStorage.getItem('restaurantId');
 
             let mesaId = selectedMesaId;
-
-            // Crear o actualizar la mesa
+            //endregion Manejo de datos
+            //region Fetch Crear o actualizar
             const method = mesaId ? 'PUT' : 'POST';
             const response = await fetch(`${Config.API_URL}/mesa/`, {
                 method,
@@ -159,6 +172,7 @@ export default function MesaTable() {
                 const error = await response.json();
                 throw new Error(error.detail || 'Error en la respuesta de la API');
             }
+            //endregion Fetch Crear o actualizar
 
             // Si es creación, obtener el nuevo ID de mesa
             if (!mesaId) {
@@ -166,7 +180,7 @@ export default function MesaTable() {
                 mesaId = data.mesa_id;
             }
 
-            // Obtener sillas actuales
+            //region Fetch obtener sillas actuales
             const res = await fetch(`${Config.API_URL}/silla/silla_mesa/?user_id=${userId}&restaurante_id=${restauranteId}&mesa_id=${mesaId}`);
             const sillaData: SillasResponse = await res.json();
             const sillasActuales = Object.entries(sillaData.sillas || {}).map(([id, silla]) => ({
@@ -174,11 +188,12 @@ export default function MesaTable() {
                 numero: silla.numero,
                 mesa_id: silla.mesa_id,
             }));
+            //endregion Fetch obtener sillas actuales
 
             const cantidadActual = sillasActuales.length;
             const nuevaCantidad = formValues.capacidad;
 
-            // Crear sillas si faltan
+            //region Crear sillas
             if (nuevaCantidad > cantidadActual) {
                 const sillasPorCrear = nuevaCantidad - cantidadActual;
                 for (let i = 0; i < sillasPorCrear; i++) {
@@ -195,8 +210,9 @@ export default function MesaTable() {
                     });
                 }
             }
+            //endregion Crear sillas
 
-            // Eliminar sillas si sobran
+            //region Eliminar sillas
             if (nuevaCantidad < cantidadActual) {
                 const sillasPorEliminar = sillasActuales
                     .sort((a, b) => b.numero - a.numero)
@@ -214,7 +230,9 @@ export default function MesaTable() {
                     });
                 }
             }
+            //endregion Eliminar sillas
 
+            //region Sweetalerts finales
             await fetchMesas();
             handleCancel();
             Swal.fire({
@@ -230,11 +248,14 @@ export default function MesaTable() {
                 text: 'Te recomendamos verificar que el numero de mesa no esté duplicado',
                 icon: 'error',
             });
+            //endregion Sweetalerts finales
         } finally {
             setIsSubmitting(false);
         }
     };
+    //endregion Editar o crear mesa
 
+    //region Eliminar mesa
     const handleDelete = async (id: string) => {
         const result = await Swal.fire({
             title: '¿Quieres eliminar esta mesa?',
@@ -248,7 +269,7 @@ export default function MesaTable() {
         if (!result.isConfirmed) {
             return;
         }
-
+        //region Fetch eliminar mesa
         setIsSubmitting(true);
         try {
             const userId = await AsyncStorage.getItem('userId');
@@ -263,6 +284,7 @@ export default function MesaTable() {
                     mesa_id: id,
                 }),
             });
+            //endregion Fetch eliminar mesa
 
             await fetchMesas();
             Swal.fire({
@@ -282,11 +304,13 @@ export default function MesaTable() {
             setIsSubmitting(false);
         }
     };
+    //endregion Eliminar mesa
 
     useEffect(() => {
         fetchMesas();
     }, []);
 
+    //region Pantallas de carga
     if (isSubmitting) {
         return (<LoadingScreen message="Actualizando mesas..." />);
     }   
@@ -294,48 +318,67 @@ export default function MesaTable() {
     if (loading) {
         return (<LoadingScreen message="Cargando mesas..." />);
     }   
+    //endregion Pantallas de carga
 
+    //region Frontend
     return (
         <View style={styles.container}>
             <View style={styles.contentContainer}>
                 {showTable && (
-                    <Animated.View style={[styles.tableContainer, { marginLeft: tableMargin }]}>
-                        <BoldText style={styles.title}>Mesas</BoldText>
-                        <ScrollView horizontal>
-                            <View>
-                                <View style={styles.headerRow}>
-                                    <BoldText style={styles.headerCell}>Número</BoldText>
-                                    <BoldText style={styles.headerCell}>Sillas</BoldText>
-                                    <BoldText style={styles.headerCell}>Estado</BoldText>
-                                    <BoldText style={styles.headerCell}>Opciones</BoldText>
-                                </View>
-                                {Object.entries(mesas).map(([id, mesa], index, array) => {
-                                    const isLast = index === array.length - 1;
-                                    return (
-                                    <View key={id} style={[styles.row, isLast && styles.lastRow]}>
-                                        <BoldText style={styles.cell}>{mesa.numero}</BoldText>
-                                        <BoldText style={styles.cell}>{mesa.capacidad}</BoldText>
-                                        <BoldText style={styles.cell}>
-                                            {mesa.estado.charAt(0).toUpperCase() + mesa.estado.slice(1)}
-                                        </BoldText>
-                                        <View style={styles.cellButtonContainer}>
-                                            <Pressable style={styles.button} onPress={() => handleEdit(id)}>
-                                                <BoldText style={styles.textButton}>Editar</BoldText>
-                                            </Pressable>
-                                            <Pressable
-                                                style={[styles.button, { backgroundColor: 'red', width: 50 }]}
-                                                onPress={() => handleDelete(id)}
-                                            >
-                                                <Icon name="trash" size={20} color="#fff" />
-                                            </Pressable>
-                                        </View>
+                    noHayMesas ? (
+                        //region Mensaje si no hay mesas
+                        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                            <BoldText style={styles.title}>No hay mesas registradas</BoldText>
+                            <BoldText style={styles.title}>Debes crear una mesa en el boton de  "Crear Mesa"</BoldText>
+                        </View>
+                        //endregion Mensaje si no hay mesas
+                    ) : (
+                        <Animated.View style={[styles.tableContainer, { marginLeft: tableMargin }]}>
+                            {
+                            //region Tabla de mesas
+                            }
+                            <BoldText style={styles.title}>Mesas</BoldText>
+                            <ScrollView horizontal>
+                                <View>
+                                    <View style={styles.headerRow}>
+                                        <BoldText style={styles.headerCell}>Número</BoldText>
+                                        <BoldText style={styles.headerCell}>Sillas</BoldText>
+                                        <BoldText style={styles.headerCell}>Estado</BoldText>
+                                        <BoldText style={styles.headerCell}>Opciones</BoldText>
                                     </View>
-                                    );
-                                })}
-                            </View>
-                        </ScrollView>
-                    </Animated.View>
+                                    {Object.entries(mesas).map(([id, mesa], index, array) => {
+                                        const isLast = index === array.length - 1;
+                                        return (
+                                        <View key={id} style={[styles.row, isLast && styles.lastRow]}>
+                                            <BoldText style={styles.cell}>{mesa.numero}</BoldText>
+                                            <BoldText style={styles.cell}>{mesa.capacidad}</BoldText>
+                                            <BoldText style={styles.cell}>
+                                                {mesa.estado.charAt(0).toUpperCase() + mesa.estado.slice(1)}
+                                            </BoldText>
+                                            <View style={styles.cellButtonContainer}>
+                                                <Pressable style={styles.button} onPress={() => handleEdit(id)}>
+                                                    <BoldText style={styles.textButton}>Editar</BoldText>
+                                                </Pressable>
+                                                <Pressable
+                                                    style={[styles.button, { backgroundColor: 'red', width: 50 }]}
+                                                    onPress={() => handleDelete(id)}
+                                                >
+                                                    <Icon name="trash" size={20} color="#fff" />
+                                                </Pressable>
+                                            </View>
+                                        </View>
+                                        );
+                                    })}
+                                </View>
+                            </ScrollView>
+                        </Animated.View>
+                    )
                 )}
+
+                {
+                //endregion Tabla de mesas
+                //region Formulario de mesa
+                }
 
                 {((selectedMesaId || isCreating) && showForm) && (
                     <Animated.View style={[styles.formContainer, { opacity: formOpacity }]}>
@@ -380,6 +423,10 @@ export default function MesaTable() {
                     </Animated.View>
                 )}
             </View>
+            {
+            //endregion Formulario de mesa
+            //region Botón flotante para crear mesa
+            }
             {showTable && (
                 <Pressable
                     style={styles.floatingButton}
@@ -396,7 +443,11 @@ export default function MesaTable() {
                     <BoldText style={styles.textButton}>+ Crear Mesa</BoldText>
                 </Pressable>
             )}
+            {
+            //endregion Botón flotante para crear mesa
+            }
         </View>
+        
     );
 }
 
