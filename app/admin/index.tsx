@@ -17,7 +17,7 @@ const [email, setEmail] = useState<string>('');
 const [password, setPassword] = useState<string>('');
 const [isSubmitting, setIsSubmitting] = useState(false);
 
-const API_URL = Config.API_URL_LOCAL;
+const API_URL = Config.API_URL;
 const API_URL_WS = Config.API_URL_LOCAL_WS;
 
 const handleLogin = async () => {
