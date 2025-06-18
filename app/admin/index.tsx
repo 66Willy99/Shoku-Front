@@ -17,6 +17,9 @@ const [email, setEmail] = useState<string>('');
 const [password, setPassword] = useState<string>('');
 const [isSubmitting, setIsSubmitting] = useState(false);
 
+const API_URL = Config.API_URL;
+const API_URL_WS = Config.API_URL_LOCAL_WS;
+
 const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
         Alert.alert('Error', 'Por favor, completa todos los campos');
@@ -32,7 +35,7 @@ const handleLogin = async () => {
     setIsSubmitting(true);
     try {
         // 1. Primero hacemos login para obtener el UID
-        const loginResponse = await fetch(`${Config.API_URL}/user/auth`, {
+        const loginResponse = await fetch(`${API_URL}/user/auth`, {
             method: 'POST',
             headers: {
             'Content-Type': 'application/json',
@@ -51,7 +54,7 @@ const handleLogin = async () => {
 
         console.log('Login exitoso, UID:', loginData.localId);
 
-        const restaurantesResponse = await fetch(`${Config.API_URL}/restaurants/?user_id=${loginData.localId}`);
+        const restaurantesResponse = await fetch(`${API_URL}/restaurants/?user_id=${loginData.localId}`);
         
         if (!restaurantesResponse.ok) {
             throw new Error('Error al obtener restaurantes');

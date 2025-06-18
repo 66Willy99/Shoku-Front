@@ -11,7 +11,7 @@ const _layout = () => {
 
     const handleSubmit = async () => {
         try {
-            const response = await fetch(`${Config.API_URL}/trabajador/login`, {
+            const response = await fetch(`${Config.API_URL_LOCAL}/trabajador/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
