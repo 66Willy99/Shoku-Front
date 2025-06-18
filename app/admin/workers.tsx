@@ -1,11 +1,14 @@
-import React, { useState, useEffect } from "react";
-import { Platform, View, Text, ScrollView, TouchableOpacity, TextInput, Modal } from "react-native";
-import { Picker } from "@react-native-picker/picker";
-import { Redirect } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
+import { View, Text, StyleSheet, ScrollView, TextInput, Animated, Easing } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Config } from "../../constants/config";
+import { Config } from "@/constants/config";
+import { Colors } from "@/constants/Colors";
+import { Pressable } from "react-native-gesture-handler";
+import Icon from "react-native-vector-icons/FontAwesome";
+import Swal from "sweetalert2";
+import { Picker } from "@react-native-picker/picker";
+import { Image } from "react-native";
 
-// Tipo para los empleados en el estado local
 type Employee = {
     id: string;
     email: string;
@@ -15,370 +18,454 @@ type Employee = {
 };
 
 export default function Workers() {
-    if (Platform.OS !== "web") {
-        return <Redirect href="/" />;
-    }
-
-    const [employees, setEmployees] = useState<Employee[]>([]);
+    const [employees, setEmployees] = useState<{ [id: string]: Employee }>({});
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
-    // Formulario de edición
-    const [formData, setFormData] = useState<Employee>({
+    const [selectedId, setSelectedId] = useState<string | null>(null);
+    const [formValues, setFormValues] = useState<Employee  & { password_hash?: string }>({
         id: "",
-        email: "",
-        nombre: "",
-        rol: "",
-        user: "",
-    });
-
-    // Modal para nuevo usuario
-    const [showNewUserModal, setShowNewUserModal] = useState(false);
-    const [newUserData, setNewUserData] = useState({
         email: "",
         nombre: "",
         rol: "",
         user: "",
         password_hash: "",
     });
-    const roles = ['admin', 'cocinero', 'garzon'];
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isCreating, setIsCreating] = useState(false);
+    const [showTable, setShowTable] = useState(true);
+    const [showForm, setShowForm] = useState(false);
 
-    useEffect(() => {
-        const fetchEmployees = async () => {
-            setLoading(true);
-            setError(null);
-            try {
-                const userId = await AsyncStorage.getItem('userId');
-                const restauranteId = await AsyncStorage.getItem('restaurantId');
-                if (!userId || !restauranteId) {
-                    setError("No se encontraron credenciales.");
-                    setLoading(false);
-                    return;
-                }
-                const response = await fetch(
-                    `${Config.API_URL}/trabajadores/?user_id=${userId}&restaurante_id=${restauranteId}`
-                );
-                const data = await response.json();
-                const empleados: Employee[] = Object.entries(data).map(([id, emp]: [string, any]) => ({
-                    id,
-                    email: emp.email,
-                    nombre: emp.nombre,
-                    rol: emp.rol,
-                    user: emp.user,
-                }));
-                console.log(empleados);
-                setEmployees(empleados);
-            } catch (error) {
-                setError("Error al cargar trabajadores.");
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchEmployees();
-    }, []);
+    const tableMargin = useRef(new Animated.Value(0)).current;
+    const formOpacity = useRef(new Animated.Value(0)).current;
 
-    const handleChange = (name: keyof Employee, value: string) => {
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
-    };
-
-    const handleSelectEmployee = (employee: Employee) => {
-        setFormData(employee);
-    };
-
-    // --- NUEVO USUARIO ---
-    const handleNewUserChange = (name: string, value: string) => {
-        setNewUserData(prev => ({
-            ...prev,
-            [name]: value
-        }));
-    };
-
-    const handleCreateUser = async () => {
-        const user_id = await AsyncStorage.getItem('userId');
-        const restaurante_id = await AsyncStorage.getItem('restaurantId');
-        if (!user_id || !restaurante_id) {
-            alert("No se encontraron credenciales.");
-            return;
-        }
-        const { email, nombre, rol, user, password_hash } = newUserData;
-        if (!email || !nombre || !rol || !user || !password_hash) {
-            alert("Completa todos los campos.");
-            return;
-        }
+    const fetchEmployees = async () => {
+        setLoading(true);
         try {
-            const response = await fetch(`${Config.API_URL}/trabajador/`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    user_id,
-                    restaurante_id,
-                    email,
-                    nombre,
-                    rol,
-                    user,
-                    password_hash
-                })
-            });
-            if (response.ok) {
-                alert("Usuario creado correctamente");
-                setShowNewUserModal(false);
-                setNewUserData({ email: "", nombre: "", rol: "", user: "", password_hash: "" });
-                // Refresca la lista
-                const empleadosResponse = await fetch(
-                    `${Config.API_URL}/trabajadores/?user_id=${user_id}&restaurante_id=${restaurante_id}`
-                );
-                const data = await empleadosResponse.json();
-                const empleados: Employee[] = Object.entries(data).map(([id, emp]: [string, any]) => ({
-                    id,
-                    email: emp.email,
-                    nombre: emp.nombre,
-                    rol: emp.rol,
-                    user: emp.user,
-                }));
-                setEmployees(empleados);
-            } else {
-                alert("Error al crear usuario");
-            }
-        } catch (e) {
-            alert("Error al crear usuario");
+            const userId = await AsyncStorage.getItem("userId");
+            const restauranteId = await AsyncStorage.getItem("restaurantId");
+            const response = await fetch(
+                `${Config.API_URL}/trabajadores/?user_id=${userId}&restaurante_id=${restauranteId}`
+            );
+            const data = await response.json();
+            setEmployees(data);
+        } catch (err) {
+            console.error("Error al obtener trabajadores:", err);
+        } finally {
+            setLoading(false);
         }
+    };
+
+    const handleEdit = (id: string) => {
+        const emp = employees[id];
+        setSelectedId(id);
+        setFormValues({ ...emp, id });
+        Animated.parallel([
+            Animated.timing(tableMargin, {
+                toValue: -100,
+                duration: 200,
+                useNativeDriver: true,
+                easing: Easing.inOut(Easing.ease),
+            }),
+            Animated.timing(formOpacity, {
+                toValue: 1,
+                duration: 300,
+                useNativeDriver: false,
+            }),
+        ]).start();
+        setShowForm(true);
+    };
+
+    const handleCancel = () => {
+        Animated.parallel([
+            Animated.timing(tableMargin, {
+                toValue: 0,
+                duration: 200,
+                useNativeDriver: false,
+                easing: Easing.out(Easing.ease),
+            }),
+            Animated.timing(formOpacity, {
+                toValue: 0,
+                duration: 300,
+                useNativeDriver: true,
+            }),
+        ]).start(() => {
+            setSelectedId(null);
+            setIsCreating(false);
+            setShowForm(false);
+        });
     };
 
     const handleSubmit = async () => {
-        const user_id = await AsyncStorage.getItem('userId');
-        const restaurante_id = await AsyncStorage.getItem('restaurantId');
-        if (!user_id || !restaurante_id) {
-            alert("No se encontraron credenciales.");
-            return;
-        }
-        if (!formData.id) {
-            alert("Selecciona un empleado para editar.");
-            return;
-        }
-        const { email, nombre, rol, user } = formData;
-        if (!email || !nombre || !rol || !user) {
-            alert("Completa todos los campos.");
-            return;
-        }
+        setIsSubmitting(true);
         try {
-            const response = await fetch(`${Config.API_URL}/trabajador/`, {
-                method: "PUT",
+            const userId = await AsyncStorage.getItem("userId");
+            const restauranteId = await AsyncStorage.getItem("restaurantId");
+            const method = isCreating ? "POST" : "PUT";
+            const url = `${Config.API_URL}/trabajador/`;
+            const body = {
+                user_id: userId,
+                restaurante_id: restauranteId,
+                ...(isCreating ? {} : { trabajador_id: formValues.id }),
+                email: formValues.email,
+                nombre: formValues.nombre,
+                rol: formValues.rol,
+                user: formValues.user,
+                ...(isCreating ? { password_hash: formValues.user } : {}), // Solo para crear, puedes pedir el password real
+            };
+            const response = await fetch(url, {
+                method,
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    user_id,
-                    restaurante_id,
-                    trabajador_id: formData.id,
-                    email,
-                    nombre,
-                    rol,
-                    user
-                })
+                body: JSON.stringify(body),
             });
-            if (response.ok) {
-                alert("Cambios guardados correctamente");
-                // Refresca la lista de empleados
-                const empleadosResponse = await fetch(
-                    `${Config.API_URL}/trabajadores/?user_id=${user_id}&restaurante_id=${restaurante_id}`
-                );
-                const data = await empleadosResponse.json();
-                const empleados: Employee[] = Object.entries(data).map(([id, emp]: [string, any]) => ({
-                    id,
-                    email: emp.email,
-                    nombre: emp.nombre,
-                    rol: emp.rol,
-                    user: emp.user,
-                }));
-                setEmployees(empleados);
-            } else {
-                alert("Error al guardar cambios");
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || "Error en la respuesta de la API");
             }
-        } catch (e) {
-            alert("Error al guardar cambios");
+            await fetchEmployees();
+            handleCancel();
+            Swal.fire({
+                title: isCreating ? "Trabajador creado" : "Trabajador actualizado",
+                icon: "success",
+                timer: 1500,
+                showConfirmButton: false,
+            });
+        } catch (error) {
+            console.error("Error al procesar trabajador:", error);
+            Swal.fire({
+                title: "Error",
+                text: "No se pudo procesar el trabajador.",
+                icon: "error",
+            });
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
-    // --- FIN NUEVO USUARIO ---
+    const handleDelete = async (id: string) => {
+        const result = await Swal.fire({
+            title: "¿Quieres eliminar este trabajador?",
+            text: "Esta acción no se puede deshacer.",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonText: "Sí, eliminar",
+            cancelButtonText: "Cancelar",
+        });
+
+        if (!result.isConfirmed) return;
+
+        setIsSubmitting(true);
+        try {
+            const userId = await AsyncStorage.getItem("userId");
+            const restauranteId = await AsyncStorage.getItem("restaurantId");
+            await fetch(`${Config.API_URL}/trabajadores/`, {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    user_id: userId,
+                    restaurante_id: restauranteId,
+                    trabajador_id: id,
+                }),
+            });
+            await fetchEmployees();
+            Swal.fire({
+                title: "Trabajador eliminado",
+                icon: "success",
+                timer: 1500,
+                showConfirmButton: false,
+            });
+        } catch (error) {
+            console.error("Error al eliminar trabajador:", error);
+            Swal.fire({
+                title: "Error",
+                text: "No se pudo eliminar el trabajador.",
+                icon: "error",
+            });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchEmployees();
+    }, []);
 
     return (
-        <View style={{ flex: 1, flexDirection: "row", backgroundColor: "#ede8e4" }}>
-            {/* Tabla de Trabajadores */}
-            <View style={{ flex: 1, backgroundColor: "#f1f5f9", borderRadius: 8, margin: 16, shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 4 }}>
-                {/* Botón para nuevo usuario */}
-                <TouchableOpacity
-                    style={{ backgroundColor: "#64748b", padding: 10, borderRadius: 4, alignItems: "center", margin: 12 }}
-                    onPress={() => setShowNewUserModal(true)}
-                >
-                    <Text style={{ color: "#fff", fontWeight: "bold" }}>Nuevo usuario</Text>
-                </TouchableOpacity>
-                {/* Encabezado de la tabla */}
-                <View style={{ flexDirection: "row", backgroundColor: "#64748b", padding: 12 }}>
-                    <View style={{ flex: 1 }}>
-                        <Text style={{ fontWeight: "bold", color: "#fff" }}>Nombre</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                        <Text style={{ fontWeight: "bold", color: "#fff" }}>Rol</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                        <Text style={{ fontWeight: "bold", color: "#fff" }}>Usuario</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                        <Text style={{ fontWeight: "bold", color: "#fff" }}>Email</Text>
-                    </View>
-                </View>
-                {/* Cuerpo de la tabla */}
-                <ScrollView>
-                    {loading && (
-                        <Text style={{ padding: 16 }}>Cargando...</Text>
-                    )}
-                    {error && (
-                        <Text style={{ color: "red", padding: 16 }}>{error}</Text>
-                    )}
-                    {employees.map((employee) => (
-                        <TouchableOpacity
-                            key={employee.id}
-                            style={{
-                                flexDirection: "row",
-                                padding: 12,
-                                borderBottomWidth: 1,
-                                borderBottomColor: "#e2e8f0",
-                                backgroundColor: formData.id === employee.id ? "#cbd5e1" : "transparent"
-                            }}
-                            onPress={() => handleSelectEmployee(employee)}
-                        >
-                            <View style={{ flex: 1 }}>
-                                <Text>{employee.nombre}</Text>
+        <View style={styles.container}>
+            <View style={styles.contentContainer}>
+                {showTable && (
+                    <Animated.View style={[styles.tableContainer, { marginLeft: tableMargin }]}>
+                        <Text style={styles.title}>Personal</Text>
+                        <ScrollView style={{ width: "60%" }} contentContainerStyle={{ flexGrow: 1 }}>
+                            <View>
+                                <View style={styles.headerRow}>
+                                    <Text style={styles.headerCell}>Nombre</Text>
+                                    <Text style={styles.headerCell}>Rol</Text>
+                                    <Text style={styles.headerCell}>Usuario</Text>
+                                    <Text style={styles.headerCell}>Email</Text>
+                                    <Text style={styles.headerCell}>Opciones</Text>
+                                </View>
+                                {Object.entries(employees).map(([id, emp], index, array) => {
+                                    const isLast = index === array.length - 1;
+                                    return (
+                                        <View key={id} style={[styles.row, isLast && styles.lastRow]}>
+                                            <View style={{ flexDirection: "row", flex: 1, marginLeft: 20, alignItems: "center" }}>
+                                                <Image
+                                                    source={{ uri: "https://dummyimage.com/40" }}
+                                                    style={{ width: 40, height: 40, borderRadius: 20, marginRight: 8 }}
+                                                />
+                                                <Text style={styles.cell}>{emp.nombre}</Text>
+                                            </View>
+                                            <Text style={styles.cell}>{emp.rol}</Text>
+                                            <Text style={styles.cell}>{emp.user}</Text>
+                                            <Text style={styles.cell}>{emp.email}</Text>
+                                            <View style={styles.cellButtonContainer}>
+                                                <Pressable style={styles.button} onPress={() => { handleEdit(id); setIsCreating(false); }}>
+                                                    <Text style={styles.textButton}>Editar</Text>
+                                                </Pressable>
+                                                <Pressable
+                                                    style={[styles.button, { backgroundColor: "red", width: 50 }]}
+                                                    onPress={() => handleDelete(id)}
+                                                >
+                                                    <Icon name="trash" size={20} color="#fff" />
+                                                </Pressable>
+                                            </View>
+                                        </View>
+                                    );
+                                })}
                             </View>
-                            <View style={{ flex: 1 }}>
-                                <Text>{employee.rol}</Text>
-                            </View>
-                            <View style={{ flex: 1 }}>
-                                <Text>{employee.user}</Text>
-                            </View>
-                            <View style={{ flex: 1 }}>
-                                <Text>{employee.email}</Text>
-                            </View>
-                        </TouchableOpacity>
-                    ))}
-                </ScrollView>
-            </View>
-            {/* Formulario de edición */}
-            <View style={{ flex: 1, padding: 20, backgroundColor: "#f1f5f9", borderRadius: 8, margin: 16, shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 4 }}>
-                <Text style={{ fontWeight: "bold", fontSize: 18, marginBottom: 16 }}>Editar Personal</Text>
-                <Text>Nombre</Text>
-                <TextInput
-                    style={{ borderWidth: 1, borderColor: "#ccc", borderRadius: 4, marginBottom: 12, padding: 8 }}
-                    value={formData.nombre ?? ""}
-                    onChangeText={text => handleChange("nombre", text)}
-                />
-                <Text>Rol</Text>
-                <Picker
-                    selectedValue={formData.rol}
-                    onValueChange={value => handleChange("rol", value)}
-                    style={{ borderWidth: 1, borderColor: "#ccc", borderRadius: 4, marginBottom: 12 }}
-                >
-                    <Picker.Item label="Selecciona un rol" value="" />
-                    {roles.map(role => (
-                        <Picker.Item key={role} label={role} value={role} />
-                    ))}
-                </Picker>
-                <Text>Usuario</Text>
-                <TextInput
-                    style={{ borderWidth: 1, borderColor: "#ccc", borderRadius: 4, marginBottom: 12, padding: 8 }}
-                    value={formData.user ?? ""}
-                    onChangeText={text => handleChange("user", text)}
-                />
-                <Text>Email</Text>
-                <TextInput
-                    style={{ borderWidth: 1, borderColor: "#ccc", borderRadius: 4, marginBottom: 12, padding: 8 }}
-                    value={formData.email ?? ""}
-                    onChangeText={text => handleChange("email", text)}
-                />
-                <TouchableOpacity
-                    style={{ backgroundColor: "#64748b", padding: 12, borderRadius: 4, alignItems: "center" }}
-                    onPress={handleSubmit}
-                >
-                    <Text style={{ color: "#fff", fontWeight: "bold" }}>Guardar Cambios</Text>
-                </TouchableOpacity>
-            </View>
-            {/* Modal para nuevo usuario */}
-            <Modal
-                visible={showNewUserModal}
-                animationType="slide"
-                transparent={true}
-                onRequestClose={() => setShowNewUserModal(false)}
-            >
-                <View style={{
-                    flex: 1,
-                    backgroundColor: "rgba(0,0,0,0.3)",
-                    justifyContent: "center",
-                    alignItems: "center"
-                }}>
-                    <View style={{
-                        backgroundColor: "#fff",
-                        padding: 24,
-                        borderRadius: 8,
-                        width: 400,
-                        shadowColor: "#000",
-                        shadowOpacity: 0.2,
-                        shadowRadius: 8
-                    }}>
-                        <Text style={{ fontWeight: "bold", fontSize: 18, marginBottom: 16 }}>Nuevo Usuario</Text>
-                        <Text>Email</Text>
+                        </ScrollView>
+                    </Animated.View>
+                )}
+
+                {(showForm || isCreating) && (
+                    <Animated.View style={[styles.formContainer, { opacity: formOpacity }]}>
+                        <Text style={styles.titleForm}>{isCreating ? "Crear Trabajador" : `Editar Trabajador`}</Text>
+                        <Text style={styles.camposForm}>Nombre:</Text>
                         <TextInput
-                            style={{ borderWidth: 1, borderColor: "#ccc", borderRadius: 4, marginBottom: 12, padding: 8 }}
-                            value={newUserData.email ?? ""}
-                            onChangeText={text => handleNewUserChange("email", text)}
+                            style={styles.input}
+                            value={formValues.nombre ?? ""}
+                            onChangeText={(val) => setFormValues({ ...formValues, nombre: val })}
+                            placeholder="Nombre"
                         />
-                        <Text>Nombre</Text>
-                        <TextInput
-                            style={{ borderWidth: 1, borderColor: "#ccc", borderRadius: 4, marginBottom: 12, padding: 8 }}
-                            value={newUserData.nombre}
-                            onChangeText={text => handleNewUserChange("nombre", text)}
-                        />
-                        <Text>Rol</Text>
-                        <Picker
-                            selectedValue={newUserData.rol}
-                            onValueChange={value => handleNewUserChange("rol", value)}
-                            style={{ borderWidth: 1, borderColor: "#ccc", borderRadius: 4, marginBottom: 12 }}
-                        >
-                            <Picker.Item label="Selecciona un rol" value="" />
-                            {roles.map(role => (
-                                <Picker.Item key={role} label={role} value={role} />
-                            ))}
-                        </Picker>
-                        <Text>Usuario</Text>
-                        <TextInput
-                            style={{ borderWidth: 1, borderColor: "#ccc", borderRadius: 4, marginBottom: 12, padding: 8 }}
-                            value={newUserData.user}
-                            onChangeText={text => handleNewUserChange("user", text)}
-                        />
-                        <Text>Clave</Text>
-                        <TextInput
-                            style={{ borderWidth: 1, borderColor: "#ccc", borderRadius: 4, marginBottom: 12, padding: 8 }}
-                            value={newUserData.password_hash}
-                            onChangeText={text => handleNewUserChange("password_hash", text)}
-                            secureTextEntry
-                        />
-                        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                            <TouchableOpacity
-                                style={{ backgroundColor: "#64748b", padding: 12, borderRadius: 4, alignItems: "center", flex: 1, marginRight: 8 }}
-                                onPress={handleCreateUser}
+                        <Text style={styles.camposForm}>Rol:</Text>
+                        <View style={styles.pickerContainer}>
+                            <Picker
+                                selectedValue={formValues.rol ?? ""}
+                                onValueChange={(itemValue) =>
+                                    setFormValues({ ...formValues, rol: itemValue })
+                                }
                             >
-                                <Text style={{ color: "#fff", fontWeight: "bold" }}>Crear</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={{ backgroundColor: "#e2e8f0", padding: 12, borderRadius: 4, alignItems: "center", flex: 1 }}
-                                onPress={() => setShowNewUserModal(false)}
-                            >
-                                <Text style={{ color: "#64748b", fontWeight: "bold" }}>Cancelar</Text>
-                            </TouchableOpacity>
+                                <Picker.Item label="Selecciona un rol" value="" />
+                                <Picker.Item label="Administrador" value="admin" />
+                                <Picker.Item label="Cocinero" value="cocinero" />
+                                <Picker.Item label="Garzón" value="garzon" />
+                            </Picker>
                         </View>
-                    </View>
-                </View>
-            </Modal>
+                        <Text style={styles.camposForm}>Email:</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={formValues.email ?? ""}
+                            onChangeText={(val) => setFormValues({ ...formValues, email: val })}
+                            placeholder="Email"
+                        />
+                        <Text style={styles.camposForm}>Usuario:</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={formValues.user ?? ""}
+                            onChangeText={(val) => setFormValues({ ...formValues, user: val })}
+                            placeholder="Usuario"
+                        />
+                        {isCreating && (
+                            <>
+                                <Text style={styles.camposForm}>Contraseña:</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={formValues.password_hash ?? ""}
+                                    onChangeText={(val) => setFormValues({ ...formValues, password_hash: val })}
+                                    placeholder="Contraseña"
+                                    secureTextEntry
+                                />
+                            </>
+                        )}
+                        <View style={styles.formButtons}>
+                            <Pressable style={[styles.button, { backgroundColor: "gray" }]} onPress={handleCancel}>
+                                <Text style={styles.textButton}>Cancelar</Text>
+                            </Pressable>
+                            <Pressable style={styles.button} onPress={handleSubmit}>
+                                <Text style={styles.textButton}>Guardar</Text>
+                            </Pressable>
+                        </View>
+                    </Animated.View>
+                )}
+            </View>
+            {showTable && (
+                <Pressable
+                    style={styles.floatingButton}
+                    onPress={() => {
+                        setFormValues({ id: "", email: "", nombre: "", rol: "", user: "" });
+                        setSelectedId(null);
+                        setIsCreating(true);
+                        setShowForm(true);
+                        Animated.parallel([
+                            Animated.timing(tableMargin, { toValue: -100, duration: 200, useNativeDriver: true }),
+                            Animated.timing(formOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+                        ]).start();
+                    }}
+                >
+                    <Text style={styles.textButton}>+ Crear Trabajador</Text>
+                </Pressable>
+            )}
         </View>
     );
 }
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: Colors.bg_light,
+        alignItems: "center",
+        position: "relative",
+    },
+    title: {
+        fontSize: 34,
+        fontWeight: "bold",
+        color: Colors.primary,
+        marginBottom: 10,
+        textAlign: "center",
+    },
+    titleForm: {
+        fontSize: 24,
+        fontWeight: "bold",
+        color: Colors.primary,
+        marginBottom: 5,
+        textAlign: "center",
+    },
+    camposForm: {
+        fontSize: 18,
+        color: Colors.primary,
+        textAlign: "center",
+    },
+    contentContainer: {
+        flex: 1,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        width: "100%",
+        paddingHorizontal: 20,
+        marginBottom: 100,
+    },
+    tableContainer: {
+        flex: 1,
+        alignItems: "center",
+    },
+    headerRow: {
+        flexDirection: "row",
+        backgroundColor: Colors.primary,
+        borderWidth: 1,
+        borderColor: Colors.primary,
+        borderTopStartRadius: 10,
+        borderTopEndRadius: 10,
+        minWidth: 450,
+        paddingHorizontal: 10,
+    },
+    row: {
+        flexDirection: "row",
+        borderBottomWidth: 1,
+        borderLeftWidth: 1,
+        borderRightWidth: 1,
+        borderColor: Colors.primary,
+        minWidth: 500,
+        minHeight: 60,
+        alignItems: "center",
+        backgroundColor: "#ffffff",
+    },
+    lastRow: {
+        borderBottomStartRadius: 10,
+        borderBottomEndRadius: 10,
+    },
+    headerCell: {
+        textAlign: "center",
+        fontSize: 16,
+        padding: 20,
+        paddingHorizontal: 40,
+        flex: 1,
+        fontWeight: "bold",
+        color: "#ffffff",
+    },
+    cell: {
+        flex: 1,
+        textAlign: "center",
+        fontSize: 16,
+        color: Colors.primary,
+        paddingVertical: 10,
+    },
+    cellButtonContainer: {
+        flex: 1,
+        flexDirection: "row",
+        justifyContent: "center",
+        alignItems: "center",
+        paddingVertical: 10,
+        gap: 10,
+    },
+    button: {
+        backgroundColor: Colors.primary,
+        width: 100,
+        height: 50,
+        borderRadius: 8,
+        alignItems: "center",
+        justifyContent: "center",
+        marginHorizontal: 5,
+    },
+    textButton: {
+        fontSize: 16,
+        color: "#ffffff",
+    },
+    formContainer: {
+        width: 300,
+        padding: 10,
+        marginLeft: 20,
+        marginRight: 150,
+        backgroundColor: "#fff",
+        borderRadius: 10,
+        elevation: 3,
+    },
+    input: {
+        borderWidth: 1,
+        borderColor: Colors.primary,
+        borderRadius: 8,
+        padding: 10,
+        marginVertical: 5,
+    },
+    pickerContainer: {
+        borderWidth: 1,
+        borderColor: Colors.primary,
+        borderRadius: 8,
+        marginVertical: 5,
+        padding: 8,
+        overflow: "hidden",
+    },
+    formButtons: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        marginTop: 10,
+    },
+    floatingButton: {
+        position: "absolute",
+        bottom: 30,
+        right: 30,
+        width: 150,
+        height: 50,
+        marginHorizontal: 10,
+        borderRadius: 8,
+        backgroundColor: Colors.primary,
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 10,
+        cursor: "pointer",
+    },
+    floatingButtonText: {
+        fontSize: 24,
+        color: "#fff",
+        fontWeight: "bold",
+        lineHeight: 24,
+    },
+});
