@@ -156,7 +156,7 @@ export default function Workers() {
         try {
             const userId = await AsyncStorage.getItem("userId");
             const restauranteId = await AsyncStorage.getItem("restaurantId");
-            await fetch(`${Config.API_URL}/trabajadores/`, {
+            await fetch(`${Config.API_URL}/trabajador/`, {
                 method: "DELETE",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
