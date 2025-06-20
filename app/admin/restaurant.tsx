@@ -24,9 +24,9 @@ export default function AdminScreen() {
             return <Redirect href="/" />;
         }
 
-    const [mesas, setMesas] = useState<{ id: string; numero: string | number; estado: string }[]>([]);
+    const [mesas, setMesas] = useState<{ id: string; numero: string | number; estado: string; capacidad: number }[]>([]);
     const [modalVisible, setModalVisible] = useState(false);
-    const [selectedMesa, setSelectedMesa] = useState<{ id: string; numero: string | number; estado: string } | null>(null);
+    const [selectedMesa, setSelectedMesa] = useState<{ id: string; numero: string | number; estado: string; capacidad: number } | null>(null);
     const [nuevoEstado, setNuevoEstado] = useState<string>("");
     const [sillas, setSillas] = useState<{ id: string; mesa_id: string }[]>([]);
     const [qrMesaId, setQrMesaId] = useState<string | null>(null);
@@ -56,7 +56,7 @@ export default function AdminScreen() {
             }catch (err){
                 console.error('Error al obtener mesas:', err);
             }finally{
-               setIsSubmitting(false); 
+                setIsSubmitting(false); 
             }
         };
         fetchMesas();
@@ -91,7 +91,7 @@ export default function AdminScreen() {
         }
     }, [selectedMesa]);
 
-    const openModal = (mesa: { id: string; numero: string | number; estado: string }) => {
+    const openModal = (mesa: { id: string; numero: string | number; estado: string; capacidad: number }) => {
         setSelectedMesa(mesa);
         setModalVisible(true);
         slideAnim.setValue(-Dimensions.get("window").height); // Arriba de la pantalla
@@ -120,17 +120,19 @@ export default function AdminScreen() {
         const mesa_id = selectedMesa.id;
         if (!user_id || !restaurante_id) return;
         setIsSubmitting(true);
+        console.log(selectedMesa);
+        console.log(`Actualizando estado de la mesa ${mesa_id} a ${nuevoEstado}`);
         try{
             await fetch(`${Config.API_URL}/mesa/`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    user_id,
-                    restaurante_id,
-                    mesa_id,
-                    capacidad: 0,
+                    user_id: user_id,
+                    restaurante_id: restaurante_id,
+                    mesa_id: mesa_id,
+                    capacidad: selectedMesa.capacidad,
                     estado: nuevoEstado,
-                    numero: 0,
+                    numero: selectedMesa.numero,
                 }),
             });
         }catch (err){
