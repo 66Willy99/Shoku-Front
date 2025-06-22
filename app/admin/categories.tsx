@@ -11,42 +11,56 @@ import Swal from 'sweetalert2';
 import { useSweetAlertWatcher } from '@/hooks/sweetAlertWatcher';
 
 type Categoria = { nombre: string; descripcion: string };
-type Plato = { id: string; nombre: string };
+interface Plato {
+    id: string;
+    nombre: string;
+    descripcion: string;
+    imagenUrl: string[];
+    precio: number;
+    stock: number;
+    categoria_id?: string;
+}
 
 export default function CategoriaScreen() {
     const [categorias, setCategorias] = useState<{ [id: string]: Categoria }>({});
-    const [platos, setPlatos] = useState<Plato[]>([]);
+    const [platos, setPlatos] = useState<{ [id: string]: Plato }>({});
     const [selectedCatId, setSelectedCatId] = useState<string | null>(null);
     const [formValues, setFormValues] = useState<Categoria>({ nombre: '', descripcion: '' });
     const [categoriaPlatos, setCategoriaPlatos] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const [showTable, setShowTable] = useState(true);
-    const flagTableRef = useRef(false);
-    const flagFormRef = useRef(false);
+    const [showTable, setShowTable] = useState(false);
     const [showForm, setShowForm] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
 
     const formOpacity = useRef(new Animated.Value(0)).current;
+    const showTableBeforeAlert = useRef(false);
 
     useSweetAlertWatcher(
         () => {
-                setShowTable(false);
-                setShowForm(false);
+            showTableBeforeAlert.current = showTable; 
+            setShowTable(false);
+            setShowForm(false);
         },
         () => {
             setTimeout(() => {
-                setShowTable(true);
-                setShowForm(true); 
+                if (showTableBeforeAlert.current) {
+                    setShowTable(true); 
+                }
+                setShowForm(true);
             }, 150);
         }
     );
 
     useEffect(() => {
+        setShowForm(false);
         fetchCategorias();
-        fetchPlatos();
     }, []);
+
+    useEffect(() =>{
+        console.log(showTable);
+    }, [showTable]);
 
     const fetchCategorias = async () => {
         const userId = await AsyncStorage.getItem('userId');
@@ -60,6 +74,7 @@ export default function CategoriaScreen() {
             console.error('Error fetching categories:', error);
         } finally {
             setLoading(false);
+            setShowTable(true);
         }
     };
 
@@ -71,6 +86,7 @@ export default function CategoriaScreen() {
             const res = await fetch(`${Config.API_URL}/platos/?user_id=${userId}&restaurante_id=${restauranteId}`);
             const data = await res.json();
             setPlatos(data.platos);
+            return data.platos;
         } catch (error) {
             console.error('Error fetching platos:', error);
         } finally {
@@ -80,15 +96,29 @@ export default function CategoriaScreen() {
 
     const handleEdit = async (id: string) => {
         const cat = categorias[id];
-        setSelectedCatId(id);
-        setFormValues(cat);
-        setIsCreating(false);
-        setCategoriaPlatos([]);
-        setShowTable(false);
-        setShowForm(true);
-        Animated.parallel([
-            Animated.timing(formOpacity, { toValue: 1, duration: 300, useNativeDriver: false }),
-        ]).start();
+        setLoading(true);
+        try {
+            const fetchedPlatos = await fetchPlatos(); // ✅ uso directo de datos
+
+            setSelectedCatId(id);
+            setFormValues(cat);
+            setIsCreating(false);
+
+            const platosAsociados = Object.entries(fetchedPlatos as { [id: string]: Plato })
+                .filter(([_, plato]) => plato.categoria_id === id)
+                .map(([pid]) => pid);
+
+            setCategoriaPlatos(platosAsociados);
+            setShowForm(true);
+            setShowTable(false);
+        } catch (error) {
+            console.error('Error al traer los platos');
+        } finally {
+            setLoading(false);
+            Animated.parallel([
+                Animated.timing(formOpacity, { toValue: 1, duration: 300, useNativeDriver: false }),
+            ]).start();
+        }
     };
 
     const handleCreate = () => {
@@ -105,14 +135,17 @@ export default function CategoriaScreen() {
 
     const handleCancel = () => {
         setShowForm(false);
+        fetchCategorias();
         Animated.parallel([
             Animated.timing(formOpacity, { toValue: 0, duration: 300, useNativeDriver: false }),
         ]).start(() => {
             setSelectedCatId(null);
             setIsCreating(false);
-            setShowTable(true);
         });
     };
+    const handlePrueba = () => {
+        console.log(categoriaPlatos);
+    }
 
     const handleSubmitCategoria = async () => {
         setIsSubmitting(true);
@@ -146,6 +179,59 @@ export default function CategoriaScreen() {
             if (isCreating) {
                 const data = await response.json();
                 categoriaId = data.category_id; 
+            }
+
+            // Obtener lista de platos que ya tenían esta categoría antes de editar
+            const platosAnteriores = Object.entries(platos)
+                .filter(([_, plato]) => plato.categoria_id === categoriaId)
+                .map(([id]) => id);
+
+            // Platos que se deben desvincular
+            const platosRemovidos = platosAnteriores.filter(id => !categoriaPlatos.includes(id));
+
+             // Asignar categoría a los platos seleccionados
+            if (categoriaPlatos.length > 0) {
+                for (const platoId of categoriaPlatos) {
+                    const plato = platos[platoId];
+                    if (!plato) continue;
+                    await fetch(`${Config.API_URL}/plato/`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            user_id: userId,
+                            restaurante_id: restauranteId,
+                            plato_id: platoId,
+                            categoria_id: categoriaId,
+                            descripcion: plato.descripcion,
+                            imagenUrl: plato.imagenUrl,
+                            nombre: plato.nombre,
+                            precio: plato.precio,
+                            stock: plato.stock,
+                        }),
+                    });
+                }
+            }
+
+            // Quitar la categoría de los platos que fueron desmarcados
+            for (const platoId of platosRemovidos) {
+                const plato = platos[platoId];
+                if (!plato) continue;
+
+                await fetch(`${Config.API_URL}/plato/`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        restaurante_id: restauranteId,
+                        plato_id: platoId,
+                        categoria_id: "", // Remover categoría
+                        descripcion: plato.descripcion,
+                        imagenUrl: plato.imagenUrl,
+                        nombre: plato.nombre,
+                        precio: plato.precio,
+                        stock: plato.stock,
+                    }),
+                });
             }
 
             await fetchCategorias();
@@ -226,7 +312,7 @@ export default function CategoriaScreen() {
     return (
         <View style={styles.container}>
             <View style={styles.contentContainer}>
-                {showTable && (
+                {((!selectedCatId || !isCreating) && showTable) && (
                     <Animated.View style={styles.tableContainer}>
                         <BoldText style={styles.title}>Categorías</BoldText>
                         {/* Tabla de categorías aquí */}
@@ -481,6 +567,7 @@ const styles = StyleSheet.create({
     },
     formSection: {
         alignItems: 'center',
+        minWidth: 250,
         width: '15%',
         padding: 10,
         marginLeft: '15%',
