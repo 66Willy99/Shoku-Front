@@ -81,6 +81,7 @@ export default function AdminLayout() {
             <Stack.Screen name="workers" />
             <Stack.Screen name="tables" />
             <Stack.Screen name="categories" />
+            <Stack.Screen name="dishes" />
             <Stack.Screen name="cocina" />
         </Stack>
         </View>

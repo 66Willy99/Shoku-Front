@@ -49,7 +49,7 @@ export default function CategoriaScreen() {
                     setShowTable(true); 
                 }
                 setShowForm(true);
-            }, 150);
+            }, 1500);
         }
     );
 
@@ -141,11 +141,9 @@ export default function CategoriaScreen() {
         ]).start(() => {
             setSelectedCatId(null);
             setIsCreating(false);
+            setShowTable(true);
         });
     };
-    const handlePrueba = () => {
-        console.log(categoriaPlatos);
-    }
 
     const handleSubmitCategoria = async () => {
         setIsSubmitting(true);
