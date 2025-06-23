@@ -20,7 +20,6 @@ export default function AdminScreen() {
     });
     const router = useRouter();
     
-    
     const handleSubmit = async () => {
         try	{
             await AsyncStorage.getItem('userId').then(async (userId) => {
