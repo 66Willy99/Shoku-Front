@@ -7,6 +7,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Order } from '../../context/OrdersContext';
 import { COLORS, FONT_SIZES, SPACING } from '../../theme';
 import API_URL from '../../lib/api';
+import { useMenu } from '../../context/MenuContext';
+import { Dish } from '../../context/MenuContext';
 
 const STEPS = [
   { key: 'confirmed', icon: 'check-circle', label: 'Pedido confirmado' },
@@ -39,6 +41,8 @@ export default function Estado() {
     user_id?: string;
     restaurante_id?: string;
   }>();
+
+  const { platos } = useMenu();
 
   const [orders, setOrders] = useState<Order[]>([]);
 
@@ -93,6 +97,19 @@ export default function Estado() {
   const activos = orders.filter(o => o.status !== 'completado' && o.status !== 'entregado');
   const completados = orders.filter(o => o.status === 'completado' || o.status === 'entregado');
 
+  const formatTime = (ms: number) =>
+    new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  const mapPlatos = (platosObj: any) => {
+  return Object.entries(platosObj || {}).map(([platoId, info]: [string, any]) => {
+    const dish = platos.find((p: Dish) => p.id === platoId);
+    return {
+      dish: dish || { id: platoId, name: 'Plato desconocido', price: 0 },
+      quantity: info?.cantidad ?? 0,
+    };
+  });
+};
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       {activos.length > 0 && (
@@ -100,13 +117,9 @@ export default function Estado() {
           <Text style={styles.statusBanner}>⌛ Pedido en curso, sigue su estado aquí</Text>
           {activos.map(o => {
             const idx = o.status ? STATUS_INDEX[o.status] ?? 0 : 0;
-            const platosArray = Object.values(o.platos || {});
+            const platosArray = mapPlatos(o.platos);
 
-            const total = platosArray.reduce((s: number, i: any) => {
-              const price = i?.dish?.price ?? 0;
-              const quantity = i?.quantity ?? 0;
-              return s + price * quantity;
-            }, 0);
+            const total = platosArray.reduce((s, i) => s + i.dish.price * i.quantity, 0);
 
             return (
               <View key={o.id} style={styles.section}>
@@ -137,9 +150,9 @@ export default function Estado() {
                   })}
                 </View>
 
-                {platosArray.map((i: any, index: number) => (
+                {platosArray.map((i, index) => (
                   <Text key={index} style={styles.detail}>
-                    🍽 {i?.dish?.name ?? 'Plato desconocido'} ×{i?.quantity ?? '?'}
+                    🍽 {i.dish.name} ×{i.quantity}
                   </Text>
                 ))}
 
@@ -156,12 +169,16 @@ export default function Estado() {
             📚 Historial de pedidos
           </Text>
           {completados.map(o => {
-            const platosArray = Object.values(o.platos || {});
+            const platosArray = mapPlatos(o.platos);
+            const doneTime = new Date(o.created_at || 0).getTime() + (o.estimatedTime || 0) * 60 * 1000;
+
             return (
               <View key={o.id} style={styles.historyCard}>
-                <Text style={styles.historyTitle}>Orden #{o.id}</Text>
-                {platosArray.map((i: any, ix: number) => (
-                  <Text key={ix}>• {i?.dish?.name ?? 'Plato'} ×{i?.quantity ?? '?'}</Text>
+                <Text style={styles.historyTitle}>
+                  Orden #{o.id} — completada a las {formatTime(doneTime)}
+                </Text>
+                {platosArray.map((i, ix) => (
+                  <Text key={ix}>• {i.dish.name} ×{i.quantity}</Text>
                 ))}
                 {o.notes && <Text>📋 Notas: {o.notes}</Text>}
               </View>
