@@ -1,14 +1,7 @@
-// carta.tsx
 import React, { useRef, useEffect, useState } from 'react';
 import {
-  ScrollView,
-  View,
-  Text,
-  Image,
-  TouchableOpacity,
-  StyleSheet,
-  Dimensions,
-  Animated,
+  ScrollView, View, Text, Image, TouchableOpacity,
+  StyleSheet, Dimensions, Animated,
 } from 'react-native';
 import { useMenu } from '../../context/MenuContext';
 import { useFavorites } from '../../context/FavoritesContext';
@@ -34,11 +27,24 @@ export default function Carta() {
   const { platos: allDishes } = useMenu();
   const { carrito } = useCarrito();
   const router = useRouter();
-  const { mesa_id, silla_id } = useLocalSearchParams<{ mesa_id?: string; silla_id?: string }>();
-  const recommended = allDishes.slice(0, 6);
 
+  // ✅ Parámetros completos
+  const {
+    mesa_id,
+    silla_id,
+    user_id,
+    restaurante_id,
+  } = useLocalSearchParams<{
+    mesa_id?: string;
+    silla_id?: string;
+    user_id?: string;
+    restaurante_id?: string;
+  }>();
+
+  const recommended = allDishes.slice(0, 6);
   const carouselRef = useRef<ScrollView>(null);
   let idx = 0;
+
   useEffect(() => {
     if (recommended.length < 2) return;
     const iv = setInterval(() => {
@@ -52,10 +58,18 @@ export default function Carta() {
   }, [recommended]);
 
   const irAlCarrito = () => {
-    if (mesa_id && silla_id) {
-      router.push(`/carrito?mesa_id=${mesa_id}&silla_id=${silla_id}`);
+    if (mesa_id && silla_id && user_id && restaurante_id) {
+      router.push({
+        pathname: '/carrito',
+        params: {
+          mesa_id,
+          silla_id,
+          user_id,
+          restaurante_id,
+        },
+      });
     } else {
-      router.push('/carrito');
+      alert('Faltan parámetros para continuar el pedido');
     }
   };
 
@@ -163,6 +177,9 @@ function Card({ dish }: { dish: Dish }) {
     </View>
   );
 }
+
+// despues sigue los StyleSheet 
+
 
 const styles = StyleSheet.create({
   fullScreen: {

@@ -1,14 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Alert
+  View, Text, ScrollView, Alert, StyleSheet,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Order } from '../../context/OrdersContext';
 import { COLORS, FONT_SIZES, SPACING } from '../../theme';
-import API_URL from '../../lib/api'; // ✅ Correcto con export default
-
+import API_URL from '../../lib/api';
 
 const STEPS = [
   { key: 'confirmed', icon: 'check-circle', label: 'Pedido confirmado' },
@@ -26,12 +24,20 @@ const STATUS_INDEX: Record<string, number> = {
 };
 
 export default function Estado() {
-  const router = useRouter();
-  const { mesa_id, silla_id, token_ws, approved } = useLocalSearchParams<{
+  const {
+    mesa_id,
+    silla_id,
+    token_ws,
+    approved,
+    user_id,
+    restaurante_id,
+  } = useLocalSearchParams<{
     mesa_id?: string;
     silla_id?: string;
     token_ws?: string;
     approved?: 'true' | 'false';
+    user_id?: string;
+    restaurante_id?: string;
   }>();
 
   const [orders, setOrders] = useState<Order[]>([]);
@@ -53,13 +59,27 @@ export default function Estado() {
     }
   }, [token_ws]);
 
-  // 🔄 Cargar pedidos desde el backend
   useEffect(() => {
-    if (!mesa_id) return;
+    if (!mesa_id || !user_id || !restaurante_id) return;
 
     const fetchPedidos = async () => {
       try {
-        const res = await fetch(`${API_URL}/pedidos/mesa/${mesa_id}`);
+        const res = await fetch(`${API_URL}/pedidos/mesa/`, {
+
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id,
+            restaurante_id,
+            mesa_id,
+          }),
+        });
+
+        if (!res.ok) {
+          console.error('Error en la respuesta del servidor:', res.status);
+          return;
+        }
+
         const data = await res.json();
         setOrders(data.pedidos || []);
       } catch (error) {
@@ -68,9 +88,9 @@ export default function Estado() {
     };
 
     fetchPedidos();
-    const interval = setInterval(fetchPedidos, 10000); // polling cada 10s
+    const interval = setInterval(fetchPedidos, 10000);
     return () => clearInterval(interval);
-  }, [mesa_id]);
+  }, [mesa_id, user_id, restaurante_id]);
 
   const activos = orders.filter(o => o.status !== 'completado' && o.status !== 'entregado');
   const completados = orders.filter(o => o.status === 'completado' || o.status === 'entregado');
@@ -100,7 +120,7 @@ export default function Estado() {
                 <Text style={styles.sectionTitle}>📦 Detalles de tu pedido</Text>
                 <Text style={styles.detail}>🧾 Orden #{o.id}</Text>
                 <Text style={styles.detail}>
-                  💵 Total: ${o.items.reduce((s, i) => s + i.dish.price * i.quantity, 0).toLocaleString()}
+                  💵 Total: ${o.platos.reduce((s, i) => s + i.price * i.quantity, 0).toLocaleString()}
                 </Text>
                 <Text style={styles.detail}>⏳ Estimado: {o.estimatedTime || 'N/A'} min</Text>
 
@@ -148,8 +168,8 @@ export default function Estado() {
                 <Text style={styles.historyTitle}>
                   Orden #{o.id} — completada a las {formatTime(doneTime)}
                 </Text>
-                {o.items.map((i, ix) => (
-                  <Text key={ix}>• {i.dish.name} ×{i.quantity}</Text>
+                {o.platos.map((i, ix) => (
+                  <Text key={ix}>• {i.name} ×{i.quantity}</Text>
                 ))}
                 {o.notes && <Text>📋 Notas: {o.notes}</Text>}
               </View>
@@ -160,7 +180,7 @@ export default function Estado() {
     </ScrollView>
   );
 }
-
+// despues viene los stylesheet
 const styles = StyleSheet.create({
   container: {
     padding: SPACING.md,

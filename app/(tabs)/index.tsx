@@ -13,7 +13,27 @@ import { useOrders } from '../../context/OrdersContext';
 
 export default function Home() {
   const router = useRouter();
-  const { mesa_id, silla_id } = useLocalSearchParams<{ mesa_id?: string; silla_id?: string }>();
+  const { mesa_id, silla_id, user_id, restaurante_id } = useLocalSearchParams<{
+    mesa_id?: string;
+    silla_id?: string;
+    user_id?: string;
+    restaurante_id?: string;
+  }>();
+
+  const defaultParams = {
+    mesa_id: '-OSpVJs33eQTSG0jnzjC',
+    silla_id: '-OSpVKS019LKyTsAgUsD',
+    user_id: 'qvTOrKKcnsNQfGQ5dd59YPm4xNf2',
+    restaurante_id: '-OOGlNS6j9ldiKwPB6zX',
+  };
+
+  const idParams = {
+    mesa_id: mesa_id ?? defaultParams.mesa_id,
+    silla_id: silla_id ?? defaultParams.silla_id,
+    user_id: user_id ?? defaultParams.user_id,
+    restaurante_id: restaurante_id ?? defaultParams.restaurante_id,
+  };
+
   const [waiterModal, setWaiterModal] = useState(false);
   const { orders } = useOrders();
 
@@ -25,19 +45,17 @@ export default function Home() {
   const tienePedidoNoPagado = orders.some(o => !o.paid);
 
   const irACarta = () => {
-    if (mesa_id && silla_id) {
-      router.push(`/carta?mesa_id=${mesa_id}&silla_id=${silla_id}`);
-    } else {
-      router.push('/carta');
-    }
+    router.push({
+      pathname: '/carta',
+      params: idParams,
+    });
   };
 
   const irAPago = () => {
-    if (mesa_id && silla_id) {
-      router.push(`/pago?mesa_id=${mesa_id}&silla_id=${silla_id}`);
-    } else {
-      router.push('/pago');
-    }
+    router.push({
+      pathname: '/pago',
+      params: idParams,
+    });
   };
 
   return (
@@ -48,35 +66,21 @@ export default function Home() {
         resizeMode="contain"
       />
 
-      <TouchableOpacity
-        onPress={irACarta}
-        style={styles.button}
-      >
+      <TouchableOpacity onPress={irACarta} style={styles.button}>
         <Text style={styles.buttonText}>📋 Ver Carta</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity
-        onPress={showWaiter}
-        style={[styles.button, styles.secondaryButton]}
-      >
+      <TouchableOpacity onPress={showWaiter} style={[styles.button, styles.secondaryButton]}>
         <Text style={styles.buttonText}>🔔 Llamar a Mesero</Text>
       </TouchableOpacity>
 
       {tienePedidoNoPagado && (
-        <TouchableOpacity
-          onPress={irAPago}
-          style={[styles.button, styles.payButton]}
-        >
+        <TouchableOpacity onPress={irAPago} style={[styles.button, styles.payButton]}>
           <Text style={styles.buttonText}>💳 Pagar pedido actual</Text>
         </TouchableOpacity>
       )}
 
-      <Modal
-        visible={waiterModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setWaiterModal(false)}
-      >
+      <Modal visible={waiterModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>🧑‍🍳 Mesero en camino</Text>
@@ -87,7 +91,6 @@ export default function Home() {
     </View>
   );
 }
-
 
 const styles = StyleSheet.create({
   container: {

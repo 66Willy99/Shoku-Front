@@ -20,12 +20,27 @@ type CartItem = {
 
 export default function Pago() {
   const router = useRouter();
-  const { mesa_id = '1', silla_id = '1' } = useLocalSearchParams<{ mesa_id?: string; silla_id?: string }>();
+  const {
+    mesa_id,
+    silla_id,
+    user_id,
+    restaurante_id,
+  } = useLocalSearchParams<{
+    mesa_id?: string;
+    silla_id?: string;
+    user_id?: string;
+    restaurante_id?: string;
+  }>();
+
+  if (!mesa_id || !silla_id) {
+    Alert.alert('Error', 'Faltan los parámetros de mesa o silla en la URL');
+    return <Text style={{ padding: 20 }}>Error: Faltan mesa_id o silla_id</Text>;
+  }
 
   const { carrito, notes, limpiarCarrito } = useCarrito();
   const { orders, addOrder, markAsPaid } = useOrders();
 
-  const [method, setMethod] = useState<'efectivo' | 'tarjeta' | 'qr' | null>(null);
+  const [method, setMethod] = useState<'efectivo' | 'tarjeta' | null>(null);
   const [waiterModal, setWaiterModal] = useState(false);
   const [tipIncluded, setTipIncluded] = useState(true);
   const [confirmModal, setConfirmModal] = useState(false);
@@ -33,7 +48,17 @@ export default function Pago() {
   const lastUnpaidOrder = orders.findLast(o => !o.paid);
   const hasPendingOrder = carrito.length === 0 && !!lastUnpaidOrder;
 
-  const items: CartItem[] = carrito.length > 0 ? carrito : lastUnpaidOrder?.items ?? [];
+  const items: CartItem[] = carrito.length > 0
+  ? carrito
+  : lastUnpaidOrder?.platos.map(plato => ({
+      dish: {
+        id: plato.id,
+        name: plato.name,
+        price: plato.price,
+      },
+      quantity: plato.quantity,
+    })) ?? [];
+
   const notesToShow = carrito.length > 0 ? notes : lastUnpaidOrder?.notes ?? '';
   const hasItems = items.length > 0;
 
@@ -43,16 +68,22 @@ export default function Pago() {
   const estimatedTime = items.reduce((s, i) => s + i.quantity * 3, 0);
 
   const showWaiter = () => {
-    setWaiterModal(true);
-    setTimeout(() => {
-      setWaiterModal(false);
-      limpiarCarrito();
-      router.replace({
-        pathname: '/estado',
-        params: { mesa_id, silla_id },
-      });
-    }, 2000);
-  };
+  setWaiterModal(true);
+  setTimeout(() => {
+    setWaiterModal(false);
+    limpiarCarrito();
+    router.replace({
+      pathname: '/estado',
+      params: {
+        mesa_id,
+        silla_id,
+        user_id,
+        restaurante_id
+      },
+    });
+  }, 2000);
+};
+
 
   async function iniciarPagoWebpay(total: number, orderId: string) {
     try {
@@ -77,7 +108,7 @@ export default function Pago() {
 
         router.replace({
           pathname: '/estado',
-          params: { mesa_id, silla_id, token_ws, approved: String(approved) },
+          params: { mesa_id, silla_id, user_id, restaurante_id, token_ws, approved: String(approved) },
         });
       } else {
         Alert.alert('Pago cancelado', 'No se completó la transacción.');
@@ -96,15 +127,7 @@ export default function Pago() {
         iniciarPagoWebpay(totalWithTip, lastUnpaidOrder.id);
       } else {
         await markAsPaid(lastUnpaidOrder.id);
-        if (method === 'efectivo') showWaiter();
-        else {
-          Alert.alert('QR', 'Funcionalidad no implementada aún.');
-          limpiarCarrito();
-          router.replace({
-            pathname: '/estado',
-            params: { mesa_id, silla_id },
-          });
-        }
+        showWaiter();
       }
     } else {
       if (!mesa_id || !silla_id) {
@@ -113,34 +136,33 @@ export default function Pago() {
       }
 
       const newOrderId = await addOrder({
-        mesa_id: mesa_id.toString(),
-        silla_id: silla_id.toString(),
-        items,
-        notes: notesToShow,
-        tipIncluded,
-        estimatedTime,
-      });
+  user_id: user_id?.toString() ?? 'qvTOrKKcnsNQfGQ5dd59YPm4xNf2',
+  restaurante_id: restaurante_id?.toString() ?? '-OOGlNS6j9ldiKwPB6zX',
+  mesa_id: mesa_id.toString(),
+  silla_id: silla_id.toString(),
+  platos: items.map(item => ({
+    id: item.dish.id,
+    name: item.dish.name,
+    price: item.dish.price,
+    quantity: item.quantity,
+  })),
+  detalle: notesToShow,
+});
+
+
 
       if (method === 'tarjeta') {
         iniciarPagoWebpay(totalWithTip, newOrderId);
       } else {
         await markAsPaid(newOrderId);
-        if (method === 'efectivo') showWaiter();
-        else {
-          Alert.alert('QR', 'Funcionalidad no implementada aún.');
-          limpiarCarrito();
-          router.replace({
-            pathname: '/estado',
-            params: { mesa_id, silla_id },
-          });
-        }
+        showWaiter();
       }
     }
   };
 
   const handlePagar = () => {
     if (!hasItems) return Alert.alert('Carrito vacío', 'Agrega productos antes de pagar.');
-    if (!method) return Alert.alert('Selecciona método', 'Elige efectivo, tarjeta o QR.');
+    if (!method) return Alert.alert('Selecciona método', 'Elige efectivo o tarjeta.');
     setConfirmModal(true);
   };
 
@@ -185,7 +207,7 @@ export default function Pago() {
 
           <Text style={styles.subheader}>Método de pago</Text>
           <View style={styles.methods}>
-            {(['tarjeta', 'qr', 'efectivo'] as const).map(m => (
+            {(['tarjeta', 'efectivo'] as const).map(m => (
               <TouchableOpacity
                 key={m}
                 style={[styles.methodButton, method === m && { borderColor: COLORS.primary }]}
@@ -193,7 +215,6 @@ export default function Pago() {
               >
                 <Text style={styles.methodText}>
                   {m === 'tarjeta' && '💳 Tarjeta'}
-                  {m === 'qr' && '📷 QR'}
                   {m === 'efectivo' && '💵 Efectivo'}
                 </Text>
               </TouchableOpacity>
@@ -241,6 +262,9 @@ export default function Pago() {
     </View>
   );
 }
+
+// despues viene los stylesheet
+
 
 
 const styles = StyleSheet.create({

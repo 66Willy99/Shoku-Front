@@ -1,28 +1,40 @@
+// context/OrdersContext.tsx
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import axios from 'axios';
 import API_URL from '../lib/api';
-import { CartItem } from './CarritoContext';
 
 export type Order = {
   id: string;
+  user_id: string;
+  restaurante_id: string;
   mesa_id: string;
   silla_id: string;
-  items: CartItem[];
-  notes?: string;
+  platos: {
+    id: string;
+    name: string;
+    price: number;
+    quantity: number;
+  }[];
+  detalle: string;
   paid: boolean;
-  tipIncluded?: boolean;
-  estimatedTime?: number;
   status?: string;
   created_at?: string;
+  estimatedTime?: number;
+  notes?: string;
 };
 
 type NewOrder = {
+  user_id: string;
+  restaurante_id: string;
   mesa_id: string;
   silla_id: string;
-  items: CartItem[];
-  notes?: string;
-  tipIncluded?: boolean;
-  estimatedTime?: number;
+  platos: {
+    id: string;
+    name: string;
+    price: number;
+    quantity: number;
+  }[];
+  detalle: string;
 };
 
 type OrdersContextType = {
@@ -40,30 +52,23 @@ const OrdersContext = createContext<OrdersContextType>({
 export const OrdersProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [orders, setOrders] = useState<Order[]>([]);
 
-  const addOrder = async ({
-    mesa_id,
-    silla_id,
-    items,
-    notes,
-    tipIncluded,
-    estimatedTime,
-  }: NewOrder): Promise<string> => {
+  const addOrder = async (orderData: NewOrder): Promise<string> => {
     try {
-      const platos: Record<string, { precio: number; cantidad: number }> = {};
-      items.forEach((item) => {
-        platos[item.dish.id] = {
-          precio: item.dish.price,
-          cantidad: item.quantity,
+      // Transformar al formato requerido por el backend
+      const platosBackendFormat: Record<string, { cantidad: number }> = {};
+      orderData.platos.forEach((plato) => {
+        platosBackendFormat[plato.id] = {
+          cantidad: plato.quantity,
         };
       });
 
       const payload = {
-        user_id: 'qvTOrKKcnsNQfGQ5dd59YPm4xNf2',
-        restaurante_id: '-OOGlNS6j9ldiKwPB6zX',
-        mesa_id,
-        silla_id,
-        platos,
-        detalle: notes ?? '',
+        user_id: orderData.user_id,
+        restaurante_id: orderData.restaurante_id,
+        mesa_id: orderData.mesa_id,
+        silla_id: orderData.silla_id,
+        platos: platosBackendFormat,
+        detalle: orderData.detalle,
       };
 
       console.log('🛒 Enviando pedido al backend:', payload);
@@ -74,20 +79,26 @@ export const OrdersProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         },
       });
 
+      const orderId = res.data ?? crypto.randomUUID();
+
       const newOrder: Order = {
-        id: res.data?.id ?? crypto.randomUUID(),
-        mesa_id,
-        silla_id,
-        items,
-        notes,
+        id: orderId,
+        user_id: orderData.user_id,
+        restaurante_id: orderData.restaurante_id,
+        mesa_id: orderData.mesa_id,
+        silla_id: orderData.silla_id,
+        platos: orderData.platos,
+        detalle: orderData.detalle,
+        notes: orderData.detalle,
         paid: false,
-        tipIncluded,
-        estimatedTime,
+        status: 'confirmado',
+        created_at: new Date().toISOString(),
+        estimatedTime: 15,
       };
 
       setOrders((prev) => [...prev, newOrder]);
       console.log('✅ Pedido creado exitosamente:', newOrder);
-      return newOrder.id;
+      return orderId;
     } catch (err: any) {
       console.error('❌ Error al crear el pedido:', err.response?.data || err.message);
       throw err;

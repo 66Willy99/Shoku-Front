@@ -11,7 +11,17 @@ import { COLORS, FONT_SIZES, SPACING } from '../../theme';
 
 export default function Carrito() {
   const router = useRouter();
-  const { mesa_id, silla_id } = useLocalSearchParams<{ mesa_id?: string; silla_id?: string }>();
+  const {
+    mesa_id,
+    silla_id,
+    user_id,
+    restaurante_id,
+  } = useLocalSearchParams<{
+    mesa_id?: string;
+    silla_id?: string;
+    user_id?: string;
+    restaurante_id?: string;
+  }>();
 
   const { carrito, notes, setNotes, removeProducto, limpiarCarrito, total } = useCarrito();
   const { addOrder } = useOrders();
@@ -31,44 +41,40 @@ export default function Carrito() {
 
   const confirmarPedido = async () => {
     if (!mesa_id || !silla_id) {
-      Alert.alert('Error', 'Falta el ID de la mesa o silla.');
+      Alert.alert('Error', 'Faltan datos para enviar el pedido.');
       return;
     }
 
     try {
       setShowConfirmModal(false);
-console.log("🛠 Enviando pedido al backend:", {
-  mesa_id,
-  silla_id,
-  items: carrito.map(item => ({
-    id: item.dish.id,
-    name: item.dish.name,
-    price: item.dish.price,
-    quantity: item.quantity
-  })),
-  notes,
-  estimatedTime,
-});
 
       await addOrder({
-        mesa_id: mesa_id.toString(),
-        silla_id: silla_id.toString(),
-        items: carrito.map(item => ({
-          dish: {
-            id: item.dish.id,
-            name: item.dish.name,
-            price: item.dish.price
-          },
-          quantity: item.quantity
+        user_id: user_id?.toString() ?? 'qvTOrKKcnsNQfGQ5dd59YPm4xNf2',
+        restaurante_id: restaurante_id?.toString() ?? '-OOGlNS6j9ldiKwPB6zX',
+        mesa_id,
+        silla_id,
+        platos: carrito.map(item => ({
+          id: item.dish.id,
+          name: item.dish.name,
+          price: item.dish.price,
+          quantity: item.quantity,
         })),
-        notes,
-        estimatedTime,
+        detalle: notes,
       });
 
       limpiarCarrito();
-      router.replace(`/estado?mesa_id=${mesa_id}&silla_id=${silla_id}`);
+
+      router.replace({
+        pathname: '/estado',
+        params: {
+          mesa_id,
+          silla_id,
+          user_id,
+          restaurante_id,
+        },
+      });
     } catch (error) {
-      console.error('❌ Error en carrito al confirmar pedido:', error);
+      console.error('❌ Error al confirmar pedido:', error);
       Alert.alert('Error', 'No se pudo enviar el pedido. Por favor, intenta nuevamente.');
     }
   };
@@ -123,7 +129,16 @@ console.log("🛠 Enviando pedido al backend:", {
           <Text style={styles.emptyText}>Tu carrito está vacío.</Text>
           <TouchableOpacity
             style={styles.emptyButton}
-            onPress={() => router.push('/carta')}
+            onPress={() => {
+              if (mesa_id && silla_id) {
+                router.push({
+                  pathname: '/carta',
+                  params: { mesa_id, silla_id, user_id, restaurante_id },
+                });
+              } else {
+                router.push('/carta');
+              }
+            }}
           >
             <Text style={styles.emptyBtnText}>🍽 Ver Carta</Text>
           </TouchableOpacity>
@@ -159,6 +174,7 @@ console.log("🛠 Enviando pedido al backend:", {
   );
 }
 
+// despues viene los stylesheet
 const styles = StyleSheet.create({
   container: { flex: 1, padding: SPACING.md, backgroundColor: COLORS.background },
   header: { fontSize: FONT_SIZES.subtitle, fontWeight: 'bold', marginBottom: SPACING.md, textAlign: 'center', color: COLORS.primary },
