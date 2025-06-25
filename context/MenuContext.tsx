@@ -1,35 +1,73 @@
 // context/MenuContext.tsx
 
-import React, { createContext, ReactNode, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
+import axios from 'axios';
+import API_URL from '../lib/api';
 
-// ▶️ Exportamos el tipo Dish para que otros contextos lo puedan usar
+// El tipo Dish se mantiene, ya que el resultado final del mapeo es el mismo.
 export type Dish = {
+  id: string;
   name: string;
   price: number;
+  description?: string;
 };
 
-// Definición inicial de tu menú — ajusta nombres y precios según quieras
-const initialMenu: Record<string, Dish[]> = {
-  Pastas: [
-    { name: 'Pasta Carbonara', price: 8000 },
-    { name: 'Pasta Boloñesa', price: 7500 },
-  ],
-  Ensaladas: [
-    { name: 'Ensalada César', price: 6000 },
-    { name: 'Ensalada Mixta', price: 5500 },
-  ],
-  Bocadillos: [
-    { name: 'Sándwich mixto', price: 4000 },
-    { name: 'Bocadillo de jamón', price: 4200 },
-  ],
+type MenuContextType = {
+  platos: Dish[];
 };
 
-const MenuContext = createContext<typeof initialMenu>(initialMenu);
+const MenuContext = createContext<MenuContextType>({
+  platos: [],
+});
 
-export const MenuProvider: React.FC<{ children: ReactNode }> = ({ children }) => (
-  <MenuContext.Provider value={initialMenu}>
-    {children}
-  </MenuContext.Provider>
-);
+export const MenuProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const restauranteId = "-OOGlNS6j9ldiKwPB6zX";
+  const userId = "qvTOrKKcnsNQfGQ5dd59YPm4xNf2";
+
+  const [platos, setPlatos] = useState<Dish[]>([]);
+
+  // ▼▼▼ FUNCIÓN fetchMenu ACTUALIZADA CON TU NUEVO CÓDIGO ▼▼▼
+  const fetchMenu = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/platos/`, {
+        params: {
+          user_id: userId,
+          restaurante_id: restauranteId,
+        },
+      });
+
+      // Log para depurar la respuesta exacta del backend
+      console.log("Respuesta del backend:", res.data);
+
+      // La nueva lógica espera un objeto que contiene una propiedad 'platos' que también es un objeto.
+      if (res.data && typeof res.data.platos === 'object') {
+        const mappedDishes: Dish[] = Object.entries(res.data.platos).map(([key, item]: [string, any]) => ({
+          id: key, // La clave del objeto se usa como ID
+          name: item.nombre,
+          price: item.precio,
+          description: item.descripcion,
+        }));
+        setPlatos(mappedDishes);
+      } else {
+        // Advertencia si la estructura de datos no es la esperada
+        console.warn("La propiedad 'platos' no es un objeto válido:", res.data);
+      }
+
+    } catch (error) {
+      console.error("Error al obtener los platos:", error);
+    }
+  };
+  // ▲▲▲ FIN DE LA ACTUALIZACIÓN ▲▲▲
+
+  useEffect(() => {
+    fetchMenu();
+  }, []);
+
+  return (
+    <MenuContext.Provider value={{ platos }}>
+      {children}
+    </MenuContext.Provider>
+  );
+};
 
 export const useMenu = () => useContext(MenuContext);

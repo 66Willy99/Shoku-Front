@@ -5,8 +5,10 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useOrders, Order } from '../../context/OrdersContext';
+import { Order } from '../../context/OrdersContext';
 import { COLORS, FONT_SIZES, SPACING } from '../../theme';
+import API_URL from '../../lib/api'; // ✅ Correcto con export default
+
 
 const STEPS = [
   { key: 'confirmed', icon: 'check-circle', label: 'Pedido confirmado' },
@@ -15,24 +17,25 @@ const STEPS = [
   { key: 'delivered', icon: 'food-fork-drink', label: 'Entregado' },
 ];
 
-const STATUS_INDEX: Record<Order['status'], number> = {
+const STATUS_INDEX: Record<string, number> = {
+  'confirmado': 0,
   'en progreso': 1,
   'listo': 2,
   'completado': 3,
+  'entregado': 3,
 };
 
 export default function Estado() {
   const router = useRouter();
-  const { token_ws, approved } = useLocalSearchParams<{
+  const { mesa_id, silla_id, token_ws, approved } = useLocalSearchParams<{
+    mesa_id?: string;
+    silla_id?: string;
     token_ws?: string;
-    approved?: string;
+    approved?: 'true' | 'false';
   }>();
 
-  const { orders } = useOrders();
+  const [orders, setOrders] = useState<Order[]>([]);
   const [now, setNow] = useState(Date.now());
-
-  // Convertimos el parámetro a booleano robustamente
-  const isApproved = approved?.toLowerCase() === 'true';
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
@@ -42,58 +45,48 @@ export default function Estado() {
   useEffect(() => {
     if (token_ws) {
       Alert.alert(
-        isApproved ? '✅ Pago aprobado' : '❌ Pago rechazado',
-        isApproved
+        approved === 'true' ? '✅ Pago aprobado' : '❌ Pago rechazado',
+        approved === 'true'
           ? 'Tu pedido ha sido registrado correctamente.'
           : 'Lo sentimos, tu pago fue rechazado.'
       );
     }
   }, [token_ws]);
 
-  const activos = orders.filter(o => o.status !== 'completado');
-  const completados = orders.filter(o => o.status === 'completado');
+  // 🔄 Cargar pedidos desde el backend
+  useEffect(() => {
+    if (!mesa_id) return;
+
+    const fetchPedidos = async () => {
+      try {
+        const res = await fetch(`${API_URL}/pedidos/mesa/${mesa_id}`);
+        const data = await res.json();
+        setOrders(data.pedidos || []);
+      } catch (error) {
+        console.error('Error al cargar pedidos:', error);
+      }
+    };
+
+    fetchPedidos();
+    const interval = setInterval(fetchPedidos, 10000); // polling cada 10s
+    return () => clearInterval(interval);
+  }, [mesa_id]);
+
+  const activos = orders.filter(o => o.status !== 'completado' && o.status !== 'entregado');
+  const completados = orders.filter(o => o.status === 'completado' || o.status === 'entregado');
 
   const formatTime = (ms: number) =>
     new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   const remaining = (o: Order) => {
-    const elapsed = (now - o.timestamp) / 1000;
-    const totalSec = o.estimatedTime * 60;
+    const startTime = new Date(o.created_at || Date.now()).getTime();
+    const elapsed = (now - startTime) / 1000;
+    const totalSec = (o.estimatedTime || 0) * 60;
     const rem = Math.max(totalSec - elapsed, 0);
     const m = Math.floor(rem / 60);
     const s = Math.floor(rem % 60).toString().padStart(2, '0');
     return `${m}:${s}`;
   };
-
-  if (!orders.length && token_ws) {
-    return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>
-          {isApproved ? '✅ Pedido aprobado' : '❌ Pago rechazado'}
-        </Text>
-        <TouchableOpacity
-          style={styles.btn}
-          onPress={() => router.push('/carta')}
-        >
-          <Text style={styles.btnText}>🛒 Volver a la Carta</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  if (!orders.length) {
-    return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>Aún no tienes ningún pedido.</Text>
-        <TouchableOpacity
-          style={styles.btn}
-          onPress={() => router.push('/carta')}
-        >
-          <Text style={styles.btnText}>🛒 Ver Carta</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -101,15 +94,15 @@ export default function Estado() {
         <View>
           <Text style={styles.statusBanner}>⌛ Pedido en curso, sigue su estado aquí</Text>
           {activos.map(o => {
-            const idx = STATUS_INDEX[o.status];
+            const idx = o.status ? STATUS_INDEX[o.status] ?? 0 : 0;
             return (
               <View key={o.id} style={styles.section}>
                 <Text style={styles.sectionTitle}>📦 Detalles de tu pedido</Text>
                 <Text style={styles.detail}>🧾 Orden #{o.id}</Text>
                 <Text style={styles.detail}>
-                  💵 Total: ${o.items.reduce((s, i) => s + i.price * i.quantity, 0).toLocaleString()}
+                  💵 Total: ${o.items.reduce((s, i) => s + i.dish.price * i.quantity, 0).toLocaleString()}
                 </Text>
-                <Text style={styles.detail}>⏳ Estimado: {o.estimatedTime} min</Text>
+                <Text style={styles.detail}>⏳ Estimado: {o.estimatedTime || 'N/A'} min</Text>
 
                 <View style={styles.timelineCard}>
                   {STEPS.map((step, i) => {
@@ -129,7 +122,7 @@ export default function Estado() {
                         >
                           {step.label}
                           {i === idx && o.status === 'en progreso' ? ` — Resta ${remaining(o)}` : ''}
-                          {i === 0 && ` (${formatTime(o.timestamp)})`}
+                          {i === 0 && ` (${formatTime(new Date(o.created_at || 0).getTime())})`}
                         </Text>
                       </View>
                     );
@@ -149,14 +142,14 @@ export default function Estado() {
             📚 Historial de pedidos
           </Text>
           {completados.map(o => {
-            const doneTime = o.timestamp + o.estimatedTime * 60 * 1000;
+            const doneTime = new Date(o.created_at || 0).getTime() + (o.estimatedTime || 0) * 60 * 1000;
             return (
               <View key={o.id} style={styles.historyCard}>
                 <Text style={styles.historyTitle}>
                   Orden #{o.id} — completada a las {formatTime(doneTime)}
                 </Text>
                 {o.items.map((i, ix) => (
-                  <Text key={ix}>• {i.name} ×{i.quantity}</Text>
+                  <Text key={ix}>• {i.dish.name} ×{i.quantity}</Text>
                 ))}
                 {o.notes && <Text>📋 Notas: {o.notes}</Text>}
               </View>
@@ -172,27 +165,6 @@ const styles = StyleSheet.create({
   container: {
     padding: SPACING.md,
     backgroundColor: COLORS.background,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: SPACING.md,
-  },
-  emptyText: {
-    fontSize: FONT_SIZES.body,
-    color: COLORS.grayDark,
-    marginBottom: SPACING.md,
-    textAlign: 'center',
-  },
-  btn: {
-    backgroundColor: COLORS.primary,
-    padding: SPACING.md,
-    borderRadius: 8,
-  },
-  btnText: {
-    color: '#fff',
-    fontWeight: 'bold',
   },
   section: {
     marginBottom: SPACING.lg,
