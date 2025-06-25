@@ -60,20 +60,13 @@ export default function Estado() {
   }, [token_ws]);
 
   useEffect(() => {
-    if (!mesa_id || !user_id || !restaurante_id) return;
+    if (!user_id || !restaurante_id) return;
 
     const fetchPedidos = async () => {
       try {
-        const res = await fetch(`${API_URL}/pedidos/mesa/`, {
-
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            user_id,
-            restaurante_id,
-            mesa_id,
-          }),
-        });
+        const res = await fetch(
+          `${API_URL}/pedidos/?user_id=${user_id}&restaurante_id=${restaurante_id}`
+        );
 
         if (!res.ok) {
           console.error('Error en la respuesta del servidor:', res.status);
@@ -81,7 +74,14 @@ export default function Estado() {
         }
 
         const data = await res.json();
-        setOrders(data.pedidos || []);
+        console.log('📦 Pedidos recibidos:', data);
+
+        if (data && Array.isArray(data.pedidos)) {
+          setOrders(data.pedidos);
+        } else {
+          console.warn('La respuesta no contiene pedidos válidos:', data);
+          setOrders([]);
+        }
       } catch (error) {
         console.error('Error al cargar pedidos:', error);
       }
@@ -90,7 +90,7 @@ export default function Estado() {
     fetchPedidos();
     const interval = setInterval(fetchPedidos, 10000);
     return () => clearInterval(interval);
-  }, [mesa_id, user_id, restaurante_id]);
+  }, [user_id, restaurante_id]);
 
   const activos = orders.filter(o => o.status !== 'completado' && o.status !== 'entregado');
   const completados = orders.filter(o => o.status === 'completado' || o.status === 'entregado');
@@ -176,6 +176,10 @@ export default function Estado() {
             );
           })}
         </>
+      )}
+
+      {activos.length === 0 && completados.length === 0 && (
+        <Text style={styles.detail}>🕐 No hay pedidos registrados para esta mesa.</Text>
       )}
     </ScrollView>
   );

@@ -49,15 +49,15 @@ export default function Pago() {
   const hasPendingOrder = carrito.length === 0 && !!lastUnpaidOrder;
 
   const items: CartItem[] = carrito.length > 0
-  ? carrito
-  : lastUnpaidOrder?.platos.map(plato => ({
-      dish: {
-        id: plato.id,
-        name: plato.name,
-        price: plato.price,
-      },
-      quantity: plato.quantity,
-    })) ?? [];
+    ? carrito
+    : lastUnpaidOrder?.platos.map(plato => ({
+        dish: {
+          id: plato.id,
+          name: plato.name,
+          price: plato.price,
+        },
+        quantity: plato.quantity,
+      })) ?? [];
 
   const notesToShow = carrito.length > 0 ? notes : lastUnpaidOrder?.notes ?? '';
   const hasItems = items.length > 0;
@@ -68,22 +68,21 @@ export default function Pago() {
   const estimatedTime = items.reduce((s, i) => s + i.quantity * 3, 0);
 
   const showWaiter = () => {
-  setWaiterModal(true);
-  setTimeout(() => {
-    setWaiterModal(false);
-    limpiarCarrito();
-    router.replace({
-      pathname: '/estado',
-      params: {
-        mesa_id,
-        silla_id,
-        user_id,
-        restaurante_id
-      },
-    });
-  }, 2000);
-};
-
+    setWaiterModal(true);
+    setTimeout(() => {
+      setWaiterModal(false);
+      limpiarCarrito();
+      router.replace({
+        pathname: '/estado',
+        params: {
+          mesa_id,
+          silla_id,
+          user_id,
+          restaurante_id
+        },
+      });
+    }, 2000);
+  };
 
   async function iniciarPagoWebpay(total: number, orderId: string) {
     try {
@@ -130,26 +129,19 @@ export default function Pago() {
         showWaiter();
       }
     } else {
-      if (!mesa_id || !silla_id) {
-        Alert.alert('Error', 'No se pudo obtener mesa o silla.');
-        return;
-      }
-
       const newOrderId = await addOrder({
-  user_id: user_id?.toString() ?? 'qvTOrKKcnsNQfGQ5dd59YPm4xNf2',
-  restaurante_id: restaurante_id?.toString() ?? '-OOGlNS6j9ldiKwPB6zX',
-  mesa_id: mesa_id.toString(),
-  silla_id: silla_id.toString(),
-  platos: items.map(item => ({
-    id: item.dish.id,
-    name: item.dish.name,
-    price: item.dish.price,
-    quantity: item.quantity,
-  })),
-  detalle: notesToShow,
-});
-
-
+        user_id: user_id?.toString() ?? 'qvTOrKKcnsNQfGQ5dd59YPm4xNf2',
+        restaurante_id: restaurante_id?.toString() ?? '-OOGlNS6j9ldiKwPB6zX',
+        mesa_id: mesa_id.toString(),
+        silla_id: silla_id.toString(),
+        platos: items.map(item => ({
+          id: item.dish.id,
+          name: item.dish.name,
+          price: item.dish.price,
+          quantity: item.quantity,
+        })),
+        detalle: notesToShow,
+      });
 
       if (method === 'tarjeta') {
         iniciarPagoWebpay(totalWithTip, newOrderId);
@@ -176,16 +168,12 @@ export default function Pago() {
           {items.map((item, i) => (
             <View key={i} style={styles.row}>
               <Text style={styles.itemText}>{item.dish.name} ×{item.quantity}</Text>
-              <Text style={styles.itemText}>
-                ${(item.dish.price * item.quantity).toLocaleString()}
-              </Text>
+              <Text style={styles.itemText}>${(item.dish.price * item.quantity).toLocaleString()}</Text>
             </View>
           ))}
 
           <View style={styles.divider} />
-          <View style={styles.pricing}>
-            <Text>Subtotal</Text><Text>${subtotal.toLocaleString()}</Text>
-          </View>
+          <View style={styles.pricing}><Text>Subtotal</Text><Text>${subtotal.toLocaleString()}</Text></View>
 
           <View style={styles.tipRow}>
             <Text>Incluir propina (10%)</Text>
@@ -193,9 +181,7 @@ export default function Pago() {
           </View>
 
           {tipIncluded && (
-            <View style={styles.pricing}>
-              <Text>Propina</Text><Text>${tipAmount.toLocaleString()}</Text>
-            </View>
+            <View style={styles.pricing}><Text>Propina</Text><Text>${tipAmount.toLocaleString()}</Text></View>
           )}
 
           <View style={[styles.pricing, { marginBottom: SPACING.lg }]}>
@@ -214,17 +200,13 @@ export default function Pago() {
                 onPress={() => setMethod(m)}
               >
                 <Text style={styles.methodText}>
-                  {m === 'tarjeta' && '💳 Tarjeta'}
-                  {m === 'efectivo' && '💵 Efectivo'}
+                  {m === 'tarjeta' ? '💳 Tarjeta' : '💵 Efectivo'}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
 
-          <TouchableOpacity
-            style={[styles.payButton, { backgroundColor: COLORS.primary }]}
-            onPress={handlePagar}
-          >
+          <TouchableOpacity style={[styles.payButton, { backgroundColor: COLORS.primary }]} onPress={handlePagar}>
             <Text style={styles.payText}>Pagar ahora</Text>
           </TouchableOpacity>
         </>
@@ -235,16 +217,10 @@ export default function Pago() {
           <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>¿Confirmar pedido?</Text>
             <Text style={styles.modalMsg}>Total a pagar: ${totalWithTip}</Text>
-            <TouchableOpacity
-              onPress={confirmarPedido}
-              style={[styles.payButton, { backgroundColor: COLORS.primary, marginTop: SPACING.sm }]}
-            >
+            <TouchableOpacity onPress={confirmarPedido} style={[styles.payButton, { backgroundColor: COLORS.primary, marginTop: SPACING.sm }]}>
               <Text style={styles.payText}>Confirmar</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setConfirmModal(false)}
-              style={{ marginTop: SPACING.sm }}
-            >
+            <TouchableOpacity onPress={() => setConfirmModal(false)} style={{ marginTop: SPACING.sm }}>
               <Text style={{ color: COLORS.grayDark }}>Cancelar</Text>
             </TouchableOpacity>
           </View>
@@ -262,6 +238,7 @@ export default function Pago() {
     </View>
   );
 }
+
 
 // despues viene los stylesheet
 
