@@ -41,12 +41,6 @@ export default function Estado() {
   }>();
 
   const [orders, setOrders] = useState<Order[]>([]);
-  const [now, setNow] = useState(Date.now());
-
-  useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     if (token_ws) {
@@ -76,8 +70,12 @@ export default function Estado() {
         const data = await res.json();
         console.log('📦 Pedidos recibidos:', data);
 
-        if (data && Array.isArray(data.pedidos)) {
-          setOrders(data.pedidos);
+        if (data && data.pedidos) {
+          const pedidosArray: Order[] = Object.entries(data.pedidos).map(([id, pedido]: [string, any]) => ({
+            ...pedido,
+            id,
+          }));
+          setOrders(pedidosArray);
         } else {
           console.warn('La respuesta no contiene pedidos válidos:', data);
           setOrders([]);
@@ -95,19 +93,6 @@ export default function Estado() {
   const activos = orders.filter(o => o.status !== 'completado' && o.status !== 'entregado');
   const completados = orders.filter(o => o.status === 'completado' || o.status === 'entregado');
 
-  const formatTime = (ms: number) =>
-    new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-  const remaining = (o: Order) => {
-    const startTime = new Date(o.created_at || Date.now()).getTime();
-    const elapsed = (now - startTime) / 1000;
-    const totalSec = (o.estimatedTime || 0) * 60;
-    const rem = Math.max(totalSec - elapsed, 0);
-    const m = Math.floor(rem / 60);
-    const s = Math.floor(rem % 60).toString().padStart(2, '0');
-    return `${m}:${s}`;
-  };
-
   return (
     <ScrollView contentContainerStyle={styles.container}>
       {activos.length > 0 && (
@@ -115,14 +100,19 @@ export default function Estado() {
           <Text style={styles.statusBanner}>⌛ Pedido en curso, sigue su estado aquí</Text>
           {activos.map(o => {
             const idx = o.status ? STATUS_INDEX[o.status] ?? 0 : 0;
+            const platosArray = Object.values(o.platos || {});
+
+            const total = platosArray.reduce((s: number, i: any) => {
+              const price = i?.dish?.price ?? 0;
+              const quantity = i?.quantity ?? 0;
+              return s + price * quantity;
+            }, 0);
+
             return (
               <View key={o.id} style={styles.section}>
-                <Text style={styles.sectionTitle}>📦 Detalles de tu pedido</Text>
+                <Text style={styles.sectionTitle}>📦 Datos de tu pedido</Text>
                 <Text style={styles.detail}>🧾 Orden #{o.id}</Text>
-                <Text style={styles.detail}>
-                  💵 Total: ${o.platos.reduce((s, i) => s + i.price * i.quantity, 0).toLocaleString()}
-                </Text>
-                <Text style={styles.detail}>⏳ Estimado: {o.estimatedTime || 'N/A'} min</Text>
+                <Text style={styles.detail}>💵 Total: ${total.toLocaleString()}</Text>
 
                 <View style={styles.timelineCard}>
                   {STEPS.map((step, i) => {
@@ -131,7 +121,7 @@ export default function Estado() {
                       <View key={step.key} style={styles.stepContainer}>
                         <MaterialCommunityIcons
                           name={step.icon as any}
-                          size={24}
+                          size={28}
                           color={isActive ? COLORS.primary : COLORS.grayLight}
                         />
                         <Text
@@ -141,13 +131,17 @@ export default function Estado() {
                           ]}
                         >
                           {step.label}
-                          {i === idx && o.status === 'en progreso' ? ` — Resta ${remaining(o)}` : ''}
-                          {i === 0 && ` (${formatTime(new Date(o.created_at || 0).getTime())})`}
                         </Text>
                       </View>
                     );
                   })}
                 </View>
+
+                {platosArray.map((i: any, index: number) => (
+                  <Text key={index} style={styles.detail}>
+                    🍽 {i?.dish?.name ?? 'Plato desconocido'} ×{i?.quantity ?? '?'}
+                  </Text>
+                ))}
 
                 {o.notes && <Text style={styles.notes}>📋 Notas: {o.notes}</Text>}
               </View>
@@ -162,14 +156,12 @@ export default function Estado() {
             📚 Historial de pedidos
           </Text>
           {completados.map(o => {
-            const doneTime = new Date(o.created_at || 0).getTime() + (o.estimatedTime || 0) * 60 * 1000;
+            const platosArray = Object.values(o.platos || {});
             return (
               <View key={o.id} style={styles.historyCard}>
-                <Text style={styles.historyTitle}>
-                  Orden #{o.id} — completada a las {formatTime(doneTime)}
-                </Text>
-                {o.platos.map((i, ix) => (
-                  <Text key={ix}>• {i.name} ×{i.quantity}</Text>
+                <Text style={styles.historyTitle}>Orden #{o.id}</Text>
+                {platosArray.map((i: any, ix: number) => (
+                  <Text key={ix}>• {i?.dish?.name ?? 'Plato'} ×{i?.quantity ?? '?'}</Text>
                 ))}
                 {o.notes && <Text>📋 Notas: {o.notes}</Text>}
               </View>
@@ -184,7 +176,7 @@ export default function Estado() {
     </ScrollView>
   );
 }
-// despues viene los stylesheet
+
 const styles = StyleSheet.create({
   container: {
     padding: SPACING.md,
@@ -209,19 +201,22 @@ const styles = StyleSheet.create({
     color: COLORS.grayDark,
   },
   timelineCard: {
-    backgroundColor: COLORS.white,
+    backgroundColor: '#fefefe',
     borderRadius: 12,
     padding: SPACING.md,
     marginVertical: SPACING.sm,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.primary,
   },
   stepContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: SPACING.xs,
+    marginBottom: SPACING.sm,
   },
   stepLabel: {
     marginLeft: 10,
     fontSize: FONT_SIZES.body,
+    fontWeight: '600',
   },
   notes: {
     fontStyle: 'italic',
