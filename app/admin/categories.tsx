@@ -30,13 +30,14 @@ export default function CategoriaScreen() {
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const [showTable, setShowTable] = useState(false);
+    const [showTable, setShowTable] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
 
     const formOpacity = useRef(new Animated.Value(0)).current;
     const showTableBeforeAlert = useRef(false);
 
+    //region SweetAlert Watcher
     useSweetAlertWatcher(
         () => {
             showTableBeforeAlert.current = showTable; 
@@ -52,16 +53,15 @@ export default function CategoriaScreen() {
             }, 1500);
         }
     );
+    //endregion SweetAlert Watcher
 
     useEffect(() => {
         setShowForm(false);
         fetchCategorias();
     }, []);
 
-    useEffect(() =>{
-        console.log(showTable);
-    }, [showTable]);
-
+    //region Fetchs
+    //region Fetch Categorias
     const fetchCategorias = async () => {
         const userId = await AsyncStorage.getItem('userId');
         const restauranteId = await AsyncStorage.getItem('restaurantId');
@@ -78,6 +78,10 @@ export default function CategoriaScreen() {
         }
     };
 
+    const noHayCats = Object.keys(categorias).length === 0;
+    //endregion Fetch Categorias
+
+    //region Fetch Platos
     const fetchPlatos = async () => {
         const userId = await AsyncStorage.getItem('userId');
         const restauranteId = await AsyncStorage.getItem('restaurantId');
@@ -93,7 +97,11 @@ export default function CategoriaScreen() {
             setLoading(false);
         }
     };
+    //endregion Fetch Platos
+    //endregion Fetchs
 
+    //region Acciones
+    //region Boton editar
     const handleEdit = async (id: string) => {
         const cat = categorias[id];
         setLoading(true);
@@ -120,19 +128,31 @@ export default function CategoriaScreen() {
             ]).start();
         }
     };
+    //endregion Boton editar
 
-    const handleCreate = () => {
-        setFormValues({ nombre: '', descripcion: '' });
-        setCategoriaPlatos([]);
-        setSelectedCatId(null);
-        setIsCreating(true);
-        setShowTable(false);
-        setShowForm(true);
-        Animated.parallel([
-            Animated.timing(formOpacity, { toValue: 1, duration: 300, useNativeDriver: false }),
-        ]).start();
+    //region Boton crear
+    const handleCreate = async () => {
+        setLoading(true);
+        try {
+            await fetchPlatos(); // solo obtener y setear los platos
+            setFormValues({ nombre: '', descripcion: '' });
+            setCategoriaPlatos([]);
+            setSelectedCatId(null);
+            setIsCreating(true);
+            setShowTable(false);
+            setShowForm(true);
+            Animated.parallel([
+                Animated.timing(formOpacity, { toValue: 1, duration: 300, useNativeDriver: false }),
+            ]).start();
+        } catch (error) {
+            console.error('Error al cargar platos para crear categoría');
+        } finally {
+            setLoading(false);
+        }
     };
+    //endregion Boton crear
 
+    //region Boton cancelar
     const handleCancel = () => {
         setShowForm(false);
         fetchCategorias();
@@ -144,7 +164,9 @@ export default function CategoriaScreen() {
             setShowTable(true);
         });
     };
+    //endregion Boton cancelar
 
+    //region Crear o actualizar categoria
     const handleSubmitCategoria = async () => {
         setIsSubmitting(true);
         try {
@@ -160,6 +182,7 @@ export default function CategoriaScreen() {
 
             let categoriaId = selectedCatId;
 
+            //region Fetch crear o actualizar
             const response = await fetch(`${Config.API_URL}/category/`, {
                 method: isCreating ? 'POST' : 'PUT',
                 headers: { 'Content-Type': 'application/json' },
@@ -173,17 +196,20 @@ export default function CategoriaScreen() {
                 const err = await response.json();
                 throw new Error(err.detail || 'Error en la operación');
             }
+            //endregion Fetch crear o actualizar
 
             if (isCreating) {
                 const data = await response.json();
                 categoriaId = data.category_id; 
             }
 
+            //region Gestion de platos
             // Obtener lista de platos que ya tenían esta categoría antes de editar
             const platosAnteriores = Object.entries(platos)
                 .filter(([_, plato]) => plato.categoria_id === categoriaId)
                 .map(([id]) => id);
 
+            //region Añadir categoria a plato
             // Platos que se deben desvincular
             const platosRemovidos = platosAnteriores.filter(id => !categoriaPlatos.includes(id));
 
@@ -209,7 +235,9 @@ export default function CategoriaScreen() {
                     });
                 }
             }
+            //endregion Añadir categoria a plato
 
+            //region Eliminar categoria a plato
             // Quitar la categoría de los platos que fueron desmarcados
             for (const platoId of platosRemovidos) {
                 const plato = platos[platoId];
@@ -231,6 +259,8 @@ export default function CategoriaScreen() {
                     }),
                 });
             }
+            //endregion Eliminar categoria a plato
+            //endregion Gestion de platos
 
             await fetchCategorias();
             handleCancel();
@@ -252,7 +282,9 @@ export default function CategoriaScreen() {
             setIsSubmitting(false);
         }
     }
+    //endregion Crear o actualizar categoria
 
+    //region Eliminar categoria
     const handleDelete = async (id: string) => {
         const result = await Swal.fire({
             title: '¿Quieres eliminar esta categoria?',
@@ -298,7 +330,10 @@ export default function CategoriaScreen() {
             setIsSubmitting(false);
         }
     };
+    //endregion Eliminar categoria
+    //endregion Acciones
 
+    //region Pantallas de carga
     if (isSubmitting) {
         return (<LoadingScreen message="Actualizando categorias..." />);
     }   
@@ -306,41 +341,62 @@ export default function CategoriaScreen() {
     if (loading) {
         return (<LoadingScreen message="Cargando categorias..." />);
     }   
+    //endregion Pantallas de carga
 
     return (
         <View style={styles.container}>
             <View style={styles.contentContainer}>
+                {
+                    //region Tabla Categorias
+                }
                 {((!selectedCatId || !isCreating) && showTable) && (
-                    <Animated.View style={styles.tableContainer}>
-                        <BoldText style={styles.title}>Categorías</BoldText>
-                        {/* Tabla de categorías aquí */}
-                        <View style={styles.headerRow}>
-                            <BoldText style={styles.headerCell}>Nombre</BoldText>
-                            <BoldText style={styles.headerCell}>Descripción</BoldText>
-                            <BoldText style={styles.headerCell}>Opciones</BoldText>
+                    noHayCats ? (
+                        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                            <BoldText style={styles.title}>No hay categorias registradas</BoldText>
+                            <BoldText style={styles.title}>Debes crear una categoría en el boton de  "Crear Categoría"</BoldText>
                         </View>
-                        {Object.entries(categorias).map(([id, cat], index, array) => {
-                            const isLast = index === array.length - 1;
-                            return (
-                            <View key={id} style={[styles.row, isLast && styles.lastRow]}>
-                                <BoldText style = {styles.cell}>{cat.nombre}</BoldText>
-                                <BoldText style = {styles.cell}>{cat.descripcion}</BoldText>
-                                <View style={styles.cellButtonContainer}>
-                                    <Pressable style={styles.button} onPress={() => handleEdit(id)}>
-                                        <BoldText style={styles.textButton}>Editar</BoldText>
-                                    </Pressable>
-                                    <Pressable
-                                        style={[styles.button, { backgroundColor: 'red', width: 50 }]}
-                                        onPress={() => handleDelete(id)}
-                                    >
-                                        <Icon name="trash" size={20} color="#fff" />
-                                    </Pressable>
-                                </View>
+                    ) : (
+                        <Animated.View style={styles.tableContainer}>
+                            <BoldText style={styles.title}>Categorías</BoldText>
+                            {/* Tabla de categorías aquí */}
+                            <View style={styles.headerRow}>
+                                <BoldText style={styles.headerCell}>Nombre</BoldText>
+                                <BoldText style={styles.headerCell}>Descripción</BoldText>
+                                <BoldText style={styles.headerCell}>Opciones</BoldText>
                             </View>
-                            );
-                        })}
-                    </Animated.View>
+                            {Object.entries(categorias).map(([id, cat], index, array) => {
+                                const isLast = index === array.length - 1;
+                                return (
+                                <View key={id} style={[styles.row, isLast && styles.lastRow]}>
+                                    <BoldText style = {styles.cell}>{cat.nombre}</BoldText>
+                                    <BoldText style = {styles.cell}>{cat.descripcion}</BoldText>
+                                    {
+                                        //region Botones 
+                                    }
+                                    <View style={styles.cellButtonContainer}>
+                                        <Pressable style={styles.button} onPress={() => handleEdit(id)}>
+                                            <BoldText style={styles.textButton}>Editar</BoldText>
+                                        </Pressable>
+                                        <Pressable
+                                            style={[styles.button, { backgroundColor: 'red', width: 50 }]}
+                                            onPress={() => handleDelete(id)}
+                                        >
+                                            <Icon name="trash" size={20} color="#fff" />
+                                        </Pressable>
+                                    </View>
+                                    {
+                                        //endregion Botones
+                                    }
+                                </View>
+                                );
+                            })}
+                        </Animated.View>
+                    )
                 )}
+                {
+                    //endregion Tabla Categorias
+                    //region Formulario Categoria
+                }
 
                 {((selectedCatId || isCreating) && showForm) && (
                     <Animated.View style={[styles.formContainer, { opacity: formOpacity }]}>
@@ -379,7 +435,9 @@ export default function CategoriaScreen() {
                                 </View>
                             </View>
 
-                            {/* Cards de platos a la derecha */}
+                            {/* Cards de platos a la derecha */
+                                //region Checks de platos
+                            }
                             <View style={styles.platosSection}>
                                 <BoldText style={styles.title}>Platos</BoldText>
                                 <ScrollView style={styles.platosScroll}>
@@ -398,15 +456,25 @@ export default function CategoriaScreen() {
                                     ))}
                                 </ScrollView>
                             </View>
+                            {
+                                //endregion Checks de platos
+                                //endregion Formulario Categoria
+                            }
                         </View>
                     </Animated.View>
                 )}
             </View>
+            {
+                //region Boton de crear
+            }
             {showTable && (
                 <Pressable style={styles.floatingButton} onPress={handleCreate}>
                     <BoldText style={styles.floatingButtonText}>+ Crear Categoría</BoldText>
                 </Pressable>
             )}
+            {
+                //endregion Boton de crear
+            }
         </View>
     );
 }

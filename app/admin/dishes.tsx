@@ -7,6 +7,9 @@ import BoldText from '@/components/ui/CustomText';
 import { Pressable } from 'react-native-gesture-handler';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import LoadingScreen from '@/components/ui/LoadingScreen'; 
+import Swal from 'sweetalert2';
+import { useSweetAlertWatcher } from '@/hooks/sweetAlertWatcher';
+
 
 type Plato = {
     nombre: string;
@@ -26,8 +29,20 @@ export default function PlatosScreen() {
     const [selectedPlatoId, setSelectedPlatoId] = useState<string | null>(null);
     const [CatId, setCatId] = useState<string | null>(null);
     const [formValues, setFormValues] = useState<Plato>({ nombre: '', descripcion: '', precio: 0, stock: 0, categoria_id: '' });
+    const [showPage, setShowPage] = useState(true);
 
     const formOpacity = useRef(new Animated.Value(0)).current;
+
+    useSweetAlertWatcher(
+        () => {
+            setShowPage(false);
+        },
+        () => {
+            setTimeout(() => {
+            setShowPage(true);
+            }, 150);
+        }
+    );
 
     const fetchPlatos = async () => {
         const userId = await AsyncStorage.getItem('userId');
@@ -37,13 +52,14 @@ export default function PlatosScreen() {
             const res = await fetch(`${Config.API_URL}/platos/?user_id=${userId}&restaurante_id=${restauranteId}`);
             const data = await res.json();
             setPlatos(data.platos);
-            console.log(platos);
         } catch (error) {
             console.error('Error fetching platos:', error);
         } finally {
             setLoading(false);
         }
     };
+
+    const noHayPlatos = Object.keys(platos).length === 0;
 
     useEffect(() => {
         fetchPlatos();
@@ -151,6 +167,58 @@ export default function PlatosScreen() {
         }
     };
 
+    const handleDelete = async (id: string) => {
+        const result = await Swal.fire({
+            title: '¿Quieres eliminar plato?',
+            text: 'Esta acción no se puede deshacer.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, eliminar',
+            cancelButtonText: 'Cancelar',
+        });
+
+        if (!result.isConfirmed) {
+            return;
+        }
+        setIsSubmitting(true);
+        try {
+            const userId = await AsyncStorage.getItem('userId');
+            const restauranteId = await AsyncStorage.getItem('restaurantId');
+
+            const response = await fetch(`${Config.API_URL}/plato/`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: userId,
+                    restaurante_id: restauranteId,
+                    plato_id: id
+                }),
+            })
+
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.detail || 'Error al eliminar el plato');
+            }
+
+            await fetchPlatos();
+            Swal.fire({
+                title: 'Plato eliminado con éxito',
+                icon: 'success',
+                timer: 1500,
+                showConfirmButton: false,
+            });
+        } catch (err) {
+            console.error('Error al eliminar el plato:', err);
+            Swal.fire({
+                title: 'Error',
+                text: 'No se pudo eliminar el plato.',
+                icon: 'error',
+            });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     if (isSubmitting) {
             return (<LoadingScreen message="Actualizando platos..." />);
         }   
@@ -162,28 +230,44 @@ export default function PlatosScreen() {
     return (
         <View style={styles.container}>
             <BoldText style={styles.title}>Platos</BoldText>
-            <ScrollView contentContainerStyle={styles.cardsContainer}>
-                {Object.entries(platos).map(([id, plato]) => (
-                    <View key={id} style={styles.card}>
-                        <BoldText style={styles.cardTitle}>{plato.nombre}</BoldText>
-                        <Text style={styles.cardDescription}>{plato.descripcion}</Text>
-                        <BoldText style={styles.cardPrice}>${plato.precio.toFixed(0)}</BoldText>
-                        <View style={styles.editButtonContainer}>
-                            <Pressable style={styles.editButton} onPress={() => handleOpenEdit( {...plato, id})}>
-                                <Icon name="pencil" size={24} color="#fff" />
-                            </Pressable>
-                        </View>
+            {showPage && (
+                noHayPlatos ? (
+                    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                        <BoldText style={styles.title}>No hay platos registrados</BoldText>
+                        <BoldText style={styles.title}>Debes crear un plato en el boton de  "Crear Plato"</BoldText>
                     </View>
-                ))}
-            </ScrollView>
-            <Pressable style={styles.fab} onPress={handleOpenCreate}>
-                <View style={styles.fabContent}>
-                    <Icon name="plus" size={20} color="#fff" style={{ marginRight: 5 }} />
-                    <BoldText style={styles.fabText}>
-                        Crear plato
-                    </BoldText>
-                </View>
-            </Pressable>
+                ) : (
+                    <ScrollView contentContainerStyle={styles.cardsContainer}>
+                        {Object.entries(platos).map(([id, plato]) => (
+                            <View key={id} style={styles.card}>
+                                <BoldText style={styles.cardTitle}>{plato.nombre}</BoldText>
+                                <Text style={styles.cardDescription}>{plato.descripcion}</Text>
+                                <BoldText style={styles.cardPrice}>${plato.precio.toFixed(0)}</BoldText>
+                                <View style={styles.removeButtonContainer}>
+                                    <Pressable style={styles.removeButton} onPress={() => handleDelete(id)}>
+                                        <Icon name="trash" size={18} color="#fff" />
+                                    </Pressable>
+                                </View>
+                                <View style={styles.editButtonContainer}>
+                                    <Pressable style={styles.editButton} onPress={() => handleOpenEdit( {...plato, id})}>
+                                        <Icon name="pencil" size={18} color="#fff" />
+                                    </Pressable>
+                                </View>
+                            </View>
+                        ))}
+                    </ScrollView>
+                )
+            )}
+            {showPage && (
+                <Pressable style={styles.fab} onPress={handleOpenCreate}>
+                    <View style={styles.fabContent}>
+                        <Icon name="plus" size={20} color="#fff" style={{ marginRight: 5 }} />
+                        <BoldText style={styles.fabText}>
+                            Crear plato
+                        </BoldText>
+                    </View>
+                </Pressable>
+            )}
 
             {selectedPlatoId !== null || isCreating ?  (
                 <Animated.View style={[styles.formContainer, { opacity: formOpacity }]}>
@@ -267,10 +351,12 @@ const styles = StyleSheet.create({
         gap: 15,
     },
     card: {
+        position: 'relative',
         backgroundColor: '#fff',
         borderRadius: 10,
         padding: 15,
         width: 160,
+        minHeight: 200,
         elevation: 3,
         shadowColor: '#000',
         shadowOpacity: 0.2,
@@ -370,12 +456,28 @@ const styles = StyleSheet.create({
     },
     editButtonContainer: {
         marginTop: 15,
-        alignItems: 'center',
+        position: 'absolute',
+        bottom: 10,
+        right: 10,
+    },
+    removeButtonContainer: {
+        marginTop: 15,
+        position: 'absolute',
+        bottom: 10,
+        left: 10,
     },
     editButton: {
-        width: 50,
-        height: 50,
+        width: 40,
+        height: 40,
         backgroundColor: Colors.primary,
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    removeButton: {
+        width: 40,
+        height: 40,
+        backgroundColor: 'red',
         borderRadius: 10,
         justifyContent: 'center',
         alignItems: 'center',
