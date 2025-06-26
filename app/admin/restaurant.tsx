@@ -304,7 +304,7 @@ export default function AdminScreen() {
                             ) : (
                                 qrSillas.map((silla) => (
                                     <View key={silla.id} style={{ marginBottom: 24, alignItems: "center" }}>
-                                        <QRCodeSVG value={`http://192.168.1.87:8081/${user_id}/${restaurante_id}/${qrMesaId}/${silla.id}`}/>
+                                        <QRCodeSVG value={`${Config.APP_URL}/${user_id}/${restaurante_id}/${qrMesaId}/${silla.id}`}/>
                                         <Text style={{ color: "#333", marginBottom: 4, textAlign: "center" }}>
                                             Silla ID: {silla.id}
                                         </Text>
