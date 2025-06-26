@@ -6,7 +6,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Order } from '../../context/OrdersContext';
 import { COLORS, FONT_SIZES, SPACING } from '../../theme';
-import API_URL from '../../lib/api';
+import { Config } from '@/constants/config';
 import { useMenu } from '../../context/MenuContext';
 import { Dish } from '../../context/MenuContext';
 
@@ -63,7 +63,7 @@ export default function Estado() {
     const fetchPedidos = async () => {
       try {
         const res = await fetch(
-          `${API_URL}/pedidos/?user_id=${user_id}&restaurante_id=${restaurante_id}`
+          `${Config.API_URL}/pedidos/?user_id=${user_id}&restaurante_id=${restaurante_id}`
         );
 
         if (!res.ok) {

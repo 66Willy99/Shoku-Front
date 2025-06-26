@@ -11,17 +11,7 @@ import { COLORS, FONT_SIZES, SPACING } from '../../theme';
 
 export default function Carrito() {
   const router = useRouter();
-  const {
-    mesa_id,
-    silla_id,
-    user_id,
-    restaurante_id,
-  } = useLocalSearchParams<{
-    mesa_id?: string;
-    silla_id?: string;
-    user_id?: string;
-    restaurante_id?: string;
-  }>();
+  const { userId, restauranteId, mesaId, sillaId } = useLocalSearchParams();
 
   const { carrito, notes, setNotes, removeProducto, limpiarCarrito, total } = useCarrito();
   const { addOrder } = useOrders();
@@ -40,19 +30,18 @@ export default function Carrito() {
   };
 
   const confirmarPedido = async () => {
-    if (!mesa_id || !silla_id) {
+    if (!mesaId || !sillaId) {
       Alert.alert('Error', 'Faltan datos para enviar el pedido.');
       return;
     }
 
     try {
       setShowConfirmModal(false);
-
       await addOrder({
-        user_id: user_id?.toString() ?? 'qvTOrKKcnsNQfGQ5dd59YPm4xNf2',
-        restaurante_id: restaurante_id?.toString() ?? '-OOGlNS6j9ldiKwPB6zX',
-        mesa_id,
-        silla_id,
+        user_id: userId?.toString(),
+        restaurante_id: restauranteId?.toString(),
+        mesa_id: mesaId?.toString(),
+        silla_id: sillaId?.toString(),
         platos: carrito.map(item => ({
           id: item.dish.id,
           name: item.dish.name,
@@ -67,10 +56,10 @@ export default function Carrito() {
       router.replace({
         pathname: '/estado',
         params: {
-          mesa_id,
-          silla_id,
-          user_id,
-          restaurante_id,
+          mesa_id: mesaId,
+          silla_id: sillaId,
+          user_id: userId,
+          restaurante_id: restauranteId,
         },
       });
     } catch (error) {
@@ -130,10 +119,10 @@ export default function Carrito() {
           <TouchableOpacity
             style={styles.emptyButton}
             onPress={() => {
-              if (mesa_id && silla_id) {
+              if (mesaId && sillaId) {
                 router.push({
                   pathname: '/carta',
-                  params: { mesa_id, silla_id, user_id, restaurante_id },
+                  params: { mesa_id: mesaId, silla_id: sillaId, user_id: userId, restaurante_id: restauranteId },
                 });
               } else {
                 router.push('/carta');

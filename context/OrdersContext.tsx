@@ -1,7 +1,7 @@
 // context/OrdersContext.tsx
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import axios from 'axios';
-import API_URL from '../lib/api';
+import { Config } from '@/constants/config';
 
 export type Order = {
   id: string;
@@ -73,7 +73,7 @@ export const OrdersProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
       console.log('🛒 Enviando pedido al backend:', payload);
 
-      const res = await axios.post(`${API_URL}/pedido/`, payload, {
+      const res = await axios.post(`${Config.API_URL}/pedido/`, payload, {
         headers: {
           'Content-Type': 'application/json',
         },

@@ -35,6 +35,8 @@ export default function AdminScreen() {
     const slideAnim = useRef(new Animated.Value(-Dimensions.get("window").height)).current; // Empieza fuera de pantalla arriba
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    const user_id = localStorage.getItem("userId");
+    const restaurante_id = localStorage.getItem("restaurantId");
     useEffect(() => {
         const fetchMesas = async () => {
             setIsSubmitting(true);
@@ -302,7 +304,7 @@ export default function AdminScreen() {
                             ) : (
                                 qrSillas.map((silla) => (
                                     <View key={silla.id} style={{ marginBottom: 24, alignItems: "center" }}>
-                                        <QRCodeSVG value={`http://192.168.211.42:8081/${qrMesaId}/${silla.id}`}/>
+                                        <QRCodeSVG value={`http://192.168.1.87:8081/${user_id}/${restaurante_id}/${qrMesaId}/${silla.id}`}/>
                                         <Text style={{ color: "#333", marginBottom: 4, textAlign: "center" }}>
                                             Silla ID: {silla.id}
                                         </Text>

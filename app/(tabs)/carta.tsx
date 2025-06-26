@@ -29,17 +29,7 @@ export default function Carta() {
   const router = useRouter();
 
   // ✅ Parámetros completos
-  const {
-    mesa_id,
-    silla_id,
-    user_id,
-    restaurante_id,
-  } = useLocalSearchParams<{
-    mesa_id?: string;
-    silla_id?: string;
-    user_id?: string;
-    restaurante_id?: string;
-  }>();
+  const { userId, restauranteId, mesaId, sillaId } = useLocalSearchParams();
 
   const recommended = allDishes.slice(0, 6);
   const carouselRef = useRef<ScrollView>(null);
@@ -58,14 +48,14 @@ export default function Carta() {
   }, [recommended]);
 
   const irAlCarrito = () => {
-    if (mesa_id && silla_id && user_id && restaurante_id) {
+    if (userId && restauranteId && mesaId && sillaId) {
       router.push({
         pathname: '/carrito',
         params: {
-          mesa_id,
-          silla_id,
-          user_id,
-          restaurante_id,
+          userId,
+          restauranteId,
+          mesaId,
+          sillaId,
         },
       });
     } else {
