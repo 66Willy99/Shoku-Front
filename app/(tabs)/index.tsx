@@ -7,12 +7,14 @@ import {
   Modal,
   StyleSheet,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { COLORS, FONT_SIZES, SPACING } from '../../theme';
 import { useOrders } from '../../context/OrdersContext';
 
 export default function Home() {
   const router = useRouter();
+  const { userId, restauranteId, mesaId, sillaId } = useLocalSearchParams();
+
   const [waiterModal, setWaiterModal] = useState(false);
   const { orders } = useOrders();
 
@@ -21,51 +23,55 @@ export default function Home() {
     setTimeout(() => setWaiterModal(false), 2000);
   };
 
-  // ✅ Mostrar botón si hay un pedido NO PAGADO, sin importar el estado
   const tienePedidoNoPagado = orders.some(o => !o.paid);
+
+  const irACarta = () => {
+    router.push({
+      pathname: '/carta',
+      params: {
+        userId,
+        restauranteId,
+        mesaId,
+        sillaId,
+      },
+    });
+  };
+
+  const irAPago = () => {
+    router.push({
+      pathname: '/pago',
+      params: {
+        userId,
+        restauranteId,
+        mesaId,
+        sillaId,
+      },
+    });
+  };
 
   return (
     <View style={styles.container}>
-      {/* Logo principal */}
       <Image
         source={require('../../assets/images/shoku-logo.png')}
         style={styles.logo}
         resizeMode="contain"
       />
 
-      {/* Ver Carta */}
-      <TouchableOpacity
-        onPress={() => router.push('/carta')}
-        style={styles.button}
-      >
+      <TouchableOpacity onPress={irACarta} style={styles.button}>
         <Text style={styles.buttonText}>📋 Ver Carta</Text>
       </TouchableOpacity>
 
-      {/* Llamar al mesero */}
-      <TouchableOpacity
-        onPress={showWaiter}
-        style={[styles.button, styles.secondaryButton]}
-      >
+      <TouchableOpacity onPress={showWaiter} style={[styles.button, styles.secondaryButton]}>
         <Text style={styles.buttonText}>🔔 Llamar a Mesero</Text>
       </TouchableOpacity>
 
-      {/* Pagar pedido si hay alguno no pagado */}
       {tienePedidoNoPagado && (
-        <TouchableOpacity
-          onPress={() => router.push('/pago')}
-          style={[styles.button, styles.payButton]}
-        >
+        <TouchableOpacity onPress={irAPago} style={[styles.button, styles.payButton]}>
           <Text style={styles.buttonText}>💳 Pagar pedido actual</Text>
         </TouchableOpacity>
       )}
 
-      {/* Modal de mesero en camino */}
-      <Modal
-        visible={waiterModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setWaiterModal(false)}
-      >
+      <Modal visible={waiterModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>🧑‍🍳 Mesero en camino</Text>

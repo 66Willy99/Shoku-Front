@@ -1,69 +1,122 @@
 // context/OrdersContext.tsx
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { CartItem } from './CarritoContext';
+import axios from 'axios';
+import { Config } from '@/constants/config';
 
-export type OrderStatus = 'en progreso' | 'listo' | 'completado';
+export type Order = {
+  id: string;
+  user_id: string;
+  restaurante_id: string;
+  mesa_id: string;
+  silla_id: string;
+  platos: {
+    id: string;
+    name: string;
+    price: number;
+    quantity: number;
+  }[];
+  detalle: string;
+  paid: boolean;
+  status?: string;
+  created_at?: string;
+  estimatedTime?: number;
+  notes?: string;
+};
 
-export interface Order {
-  id:             number;
-  items:          CartItem[];
-  notes:          string;
-  tipIncluded:    boolean;
-  estimatedTime:  number;
-  timestamp:      number;
-  status:         OrderStatus;
-  paid:           boolean;
-}
+type NewOrder = {
+  user_id: string;
+  restaurante_id: string;
+  mesa_id: string;
+  silla_id: string;
+  platos: {
+    id: string;
+    name: string;
+    price: number;
+    quantity: number;
+  }[];
+  detalle: string;
+};
 
-interface OrdersContextType {
-  orders:   Order[];
-  addOrder: (
-    items: CartItem[],
-    notes: string,
-    tipIncluded: boolean,
-    estimatedTime: number
-  ) => number;
-  markAsPaid: (orderId: number) => void;
-}
+type OrdersContextType = {
+  orders: Order[];
+  addOrder: (orderData: NewOrder) => Promise<string>;
+  markAsPaid: (orderId: string) => Promise<void>;
+};
 
-const OrdersContext = createContext<OrdersContextType | null>(null);
+const OrdersContext = createContext<OrdersContextType>({
+  orders: [],
+  addOrder: async () => '',
+  markAsPaid: async () => {},
+});
 
-export const OrdersProvider = ({ children }: { children: ReactNode }) => {
+export const OrdersProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [orders, setOrders] = useState<Order[]>([]);
 
-  const addOrder = (
-    items: CartItem[],
-    notes: string,
-    tipIncluded: boolean,
-    estimatedTime: number
-  ) => {
-    const id = Math.floor(1000 + Math.random() * 9000);
-    const timestamp = Date.now();
-    const newOrder: Order = {
-      id,
-      items,
-      notes,
-      tipIncluded,
-      estimatedTime,
-      timestamp,
-      status: 'en progreso',
-      paid: false,
-    };
-    setOrders(prev => [...prev, newOrder]);
+  const addOrder = async (orderData: NewOrder): Promise<string> => {
+    try {
+      // Transformar al formato requerido por el backend
+      const platosBackendFormat: Record<string, { cantidad: number }> = {};
+      orderData.platos.forEach((plato) => {
+        platosBackendFormat[plato.id] = {
+          cantidad: plato.quantity,
+        };
+      });
 
-    // Simula el avance de estado
-    setTimeout(() => {
-      setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'listo' } : o));
-      setTimeout(() => {
-        setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'completado' } : o));
-      }, 60000);
-    }, estimatedTime * 60000);
+      const payload = {
+        user_id: orderData.user_id,
+        restaurante_id: orderData.restaurante_id,
+        mesa_id: orderData.mesa_id,
+        silla_id: orderData.silla_id,
+        platos: platosBackendFormat,
+        detalle: orderData.detalle,
+      };
 
-    return id;
+      console.log('🛒 Enviando pedido al backend:', payload);
+
+      const res = await axios.post(`${Config.API_URL}/pedido/`, payload, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const orderId = res.data ?? crypto.randomUUID();
+
+      const newOrder: Order = {
+        id: orderId,
+        user_id: orderData.user_id,
+        restaurante_id: orderData.restaurante_id,
+        mesa_id: orderData.mesa_id,
+        silla_id: orderData.silla_id,
+        platos: orderData.platos,
+        detalle: orderData.detalle,
+        notes: orderData.detalle,
+        paid: false,
+        status: 'confirmado',
+        created_at: new Date().toISOString(),
+        estimatedTime: 15,
+      };
+
+      setOrders((prev) => [...prev, newOrder]);
+      console.log('✅ Pedido creado exitosamente:', newOrder);
+      return orderId;
+    } catch (err: any) {
+      console.error('❌ Error al crear el pedido:', err.response?.data || err.message);
+      throw err;
+    }
   };
 
-  const markAsPaid = (orderId: number) => {
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, paid: true } : o));
+  const markAsPaid = async (orderId: string) => {
+    try {
+      setOrders((prev) =>
+        prev.map((order) =>
+          order.id === orderId ? { ...order, paid: true } : order
+        )
+      );
+      console.log(`✅ Pedido ${orderId} marcado como pagado.`);
+    } catch (err) {
+      console.error(`❌ Error al marcar el pedido ${orderId} como pagado:`, err);
+      throw err;
+    }
   };
 
   return (
@@ -73,8 +126,4 @@ export const OrdersProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-export const useOrders = () => {
-  const ctx = useContext(OrdersContext);
-  if (!ctx) throw new Error('useOrders debe usarse dentro de OrdersProvider');
-  return ctx;
-};
+export const useOrders = () => useContext(OrdersContext);
