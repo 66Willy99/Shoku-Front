@@ -1,20 +1,14 @@
 import React, { useRef, useEffect, useState } from 'react';
 import {
-  ScrollView,
-  View,
-  Text,
-  Image,
-  TouchableOpacity,
-  StyleSheet,
-  Dimensions,
-  Animated,
+  ScrollView, View, Text, Image, TouchableOpacity,
+  StyleSheet, Dimensions, Animated,
 } from 'react-native';
 import { useMenu } from '../../context/MenuContext';
 import { useFavorites } from '../../context/FavoritesContext';
 import { useCarrito } from '../../context/CarritoContext';
 import { dishImages } from '../../assets/images';
 import { COLORS, FONT_SIZES, SPACING } from '../../theme';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const H_PAD = SPACING.md;
@@ -30,14 +24,27 @@ type Dish = {
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 export default function Carta() {
-  const menu = useMenu();
+  const { platos: allDishes } = useMenu();
   const { carrito } = useCarrito();
   const router = useRouter();
-  const allDishes = Object.values(menu).flat() as Dish[];
-  const recommended = allDishes.slice(0, 6);
 
+  // ✅ Parámetros completos
+  const {
+    mesa_id,
+    silla_id,
+    user_id,
+    restaurante_id,
+  } = useLocalSearchParams<{
+    mesa_id?: string;
+    silla_id?: string;
+    user_id?: string;
+    restaurante_id?: string;
+  }>();
+
+  const recommended = allDishes.slice(0, 6);
   const carouselRef = useRef<ScrollView>(null);
   let idx = 0;
+
   useEffect(() => {
     if (recommended.length < 2) return;
     const iv = setInterval(() => {
@@ -49,6 +56,22 @@ export default function Carta() {
     }, 3000);
     return () => clearInterval(iv);
   }, [recommended]);
+
+  const irAlCarrito = () => {
+    if (mesa_id && silla_id && user_id && restaurante_id) {
+      router.push({
+        pathname: '/carrito',
+        params: {
+          mesa_id,
+          silla_id,
+          user_id,
+          restaurante_id,
+        },
+      });
+    } else {
+      alert('Faltan parámetros para continuar el pedido');
+    }
+  };
 
   return (
     <View style={styles.fullScreen}>
@@ -67,10 +90,7 @@ export default function Carta() {
           {recommended.map((dish, i) => (
             <View
               key={dish.name}
-              style={[
-                styles.carouselItem,
-                { marginRight: i < recommended.length - 1 ? GAP : 0 },
-              ]}
+              style={[styles.carouselItem, { marginRight: i < recommended.length - 1 ? GAP : 0 }]}
             >
               <Card dish={dish} />
             </View>
@@ -88,7 +108,7 @@ export default function Carta() {
       </ScrollView>
 
       {carrito.length > 0 && (
-        <TouchableOpacity style={styles.continuarBtn} onPress={() => router.push('/carrito')}>
+        <TouchableOpacity style={styles.continuarBtn} onPress={irAlCarrito}>
           <Text style={styles.continuarText}>🧾 Continuar pedido</Text>
         </TouchableOpacity>
       )}
@@ -111,6 +131,7 @@ function Card({ dish }: { dish: Dish }) {
       Animated.spring(scale, { toValue: 1, friction: 3, useNativeDriver: true }),
     ]).start();
   };
+
   const showFeedback = (msg: string) => {
     setFeedback(msg);
     Animated.sequence([
@@ -125,6 +146,7 @@ function Card({ dish }: { dish: Dish }) {
     agregarProducto(dish.name);
     showFeedback('¡Agregado!');
   };
+
   const onFav = () => {
     bump();
     toggle(dish.name);
@@ -138,9 +160,7 @@ function Card({ dish }: { dish: Dish }) {
         <Text style={styles.name}>{dish.name}</Text>
         <Text style={styles.price}>${dish.price.toLocaleString()}</Text>
       </View>
-      {dish.description && (
-        <Text style={styles.description}>{dish.description}</Text>
-      )}
+      {dish.description && <Text style={styles.description}>{dish.description}</Text>}
       <View style={styles.actions}>
         <AnimatedTouchable onPress={onFav} style={{ transform: [{ scale }] }}>
           <Text style={[styles.icon, isFav && { color: COLORS.secondary }]}>
@@ -157,6 +177,9 @@ function Card({ dish }: { dish: Dish }) {
     </View>
   );
 }
+
+// despues sigue los StyleSheet 
+
 
 const styles = StyleSheet.create({
   fullScreen: {

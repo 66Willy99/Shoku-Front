@@ -22,7 +22,7 @@
     ],
     "platforms": ["ios", "android", "web"],
     "extra": {
-      "API_URL": "http://20.206.249.77:8000"
+      "API_URL": "http://192.168.18.157:8000"
     },
     "ios": {
       "supportsTablet": true

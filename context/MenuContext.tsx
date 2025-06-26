@@ -1,35 +1,75 @@
 // context/MenuContext.tsx
 
-import React, { createContext, ReactNode, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
+import axios from 'axios';
+import API_URL from '../lib/api';
 
-// ▶️ Exportamos el tipo Dish para que otros contextos lo puedan usar
+// Tipo de plato
 export type Dish = {
+  id: string;
   name: string;
   price: number;
+  description?: string;
 };
 
-// Definición inicial de tu menú — ajusta nombres y precios según quieras
-const initialMenu: Record<string, Dish[]> = {
-  Pastas: [
-    { name: 'Pasta Carbonara', price: 8000 },
-    { name: 'Pasta Boloñesa', price: 7500 },
-  ],
-  Ensaladas: [
-    { name: 'Ensalada César', price: 6000 },
-    { name: 'Ensalada Mixta', price: 5500 },
-  ],
-  Bocadillos: [
-    { name: 'Sándwich mixto', price: 4000 },
-    { name: 'Bocadillo de jamón', price: 4200 },
-  ],
+// Tipo del contexto
+type MenuContextType = {
+  platos: Dish[];
+  setPlatos: (menu: Dish[]) => void;
 };
 
-const MenuContext = createContext<typeof initialMenu>(initialMenu);
+// Crear contexto con valores por defecto
+const MenuContext = createContext<MenuContextType>({
+  platos: [],
+  setPlatos: () => {},
+});
 
-export const MenuProvider: React.FC<{ children: ReactNode }> = ({ children }) => (
-  <MenuContext.Provider value={initialMenu}>
-    {children}
-  </MenuContext.Provider>
-);
+// Proveedor del contexto
+export const MenuProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const restauranteId = "-OOGlNS6j9ldiKwPB6zX";
+  const userId = "qvTOrKKcnsNQfGQ5dd59YPm4xNf2";
 
+  const [platos, setPlatos] = useState<Dish[]>([]);
+
+  const fetchMenu = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/platos/`, {
+        params: {
+          user_id: userId,
+          restaurante_id: restauranteId,
+        },
+      });
+
+      console.log("📦 Respuesta del backend:", res.data);
+
+      if (res.data && typeof res.data.platos === 'object') {
+        const mappedDishes: Dish[] = Object.entries(res.data.platos).map(
+          ([key, item]: [string, any]) => ({
+            id: key,
+            name: item.nombre,
+            price: item.precio,
+            description: item.descripcion,
+          })
+        );
+        setPlatos(mappedDishes);
+      } else {
+        console.warn("⚠️ La propiedad 'platos' no es un objeto válido:", res.data);
+      }
+    } catch (error) {
+      console.error("❌ Error al obtener los platos:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchMenu();
+  }, []);
+
+  return (
+    <MenuContext.Provider value={{ platos, setPlatos }}>
+      {children}
+    </MenuContext.Provider>
+  );
+};
+
+// Hook para acceder fácilmente al contexto
 export const useMenu = () => useContext(MenuContext);
