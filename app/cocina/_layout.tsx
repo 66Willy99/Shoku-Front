@@ -8,8 +8,8 @@ import LoadingScreen from '@/components/ui/LoadingScreen';
 
 const CocinaLayout = ({ children }: { children: React.ReactNode }) => {
     const ws = useRef<WebSocket | null>(null);
-    const APIURL = Config.API_URL_LOCAL; //Usa Config.API_URL_LOCAL para desarrollo local o Config.API_URL para producción
-    const APIURLWS = Config.API_URL_LOCAL_WS;  //Usa Config.API_URL_LOCAL_WS para desarrollo local o Config.API_URL_WS_PROD para producción
+    const APIURL = Config.API_URL; //Usa Config.API_URL_LOCAL para desarrollo local o Config.API_URL para producción
+    const APIURLWS = Config.API_URL_WS;  //Usa Config.API_URL_LOCAL_WS para desarrollo local o Config.API_URL_WS_PROD para producción
     
     const [pedidos, setPedidos] = useState<
         {
