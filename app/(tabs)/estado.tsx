@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, ScrollView, Alert, StyleSheet, TouchableOpacity,
+  View, Text, ScrollView, Alert, TouchableOpacity, StyleSheet,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Order } from '../../context/OrdersContext';
-import { COLORS, FONT_SIZES, SPACING } from '../../theme';
+import { COLORS, SPACING, FONT_SIZES } from '../../theme';
 import { Config } from '@/constants/config';
 import { useMenu } from '../../context/MenuContext';
 import { Dish } from '../../context/MenuContext';
@@ -23,6 +23,7 @@ const STATUS_INDEX: Record<string, number> = {
   'listo': 2,
   'completado': 3,
   'entregado': 3,
+  'pagado': 0, // ✅ Estado inicial post-Webpay
 };
 
 export default function Estado() {
@@ -47,7 +48,7 @@ export default function Estado() {
   const [orders, setOrders] = useState<Order[]>([]);
 
   useEffect(() => {
-    if (token_ws) {
+    if (token_ws && approved !== undefined) {
       Alert.alert(
         approved === 'true' ? '✅ Pago aprobado' : '❌ Pago rechazado',
         approved === 'true'
@@ -58,7 +59,10 @@ export default function Estado() {
   }, [token_ws]);
 
   useEffect(() => {
-    if (!user_id || !restaurante_id) return;
+    if (!user_id || !restaurante_id) {
+      Alert.alert("Error", "Faltan datos de usuario o restaurante en la URL");
+      return;
+    }
 
     const fetchPedidos = async () => {
       try {
@@ -75,10 +79,12 @@ export default function Estado() {
         console.log('📦 Pedidos recibidos:', data);
 
         if (data && data.pedidos) {
-          const pedidosArray: Order[] = Object.entries(data.pedidos).map(([id, pedido]: [string, any]) => ({
-            ...pedido,
-            id,
-          }));
+          const pedidosArray: Order[] = Object.entries(data.pedidos).map(
+            ([id, pedido]: [string, any]) => ({
+              ...pedido,
+              id,
+            })
+          );
           setOrders(pedidosArray);
         } else {
           console.warn('La respuesta no contiene pedidos válidos:', data);
@@ -100,48 +106,41 @@ export default function Estado() {
   const formatTime = (ms: number) =>
     new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-  const mapPlatos = (platosObj: any) => {
-    return Object.entries(platosObj || {}).map(([platoId, info]: [string, any]) => {
+  const mapPlatos = (platosObj: any) =>
+    Object.entries(platosObj || {}).map(([platoId, info]: [string, any]) => {
       const dish = platos.find((p: Dish) => p.id === platoId);
       return {
         dish: dish || { id: platoId, name: 'Plato desconocido', price: 0 },
         quantity: info?.cantidad ?? 0,
       };
     });
-  };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView contentContainerStyle={{ padding: SPACING.md }}>
       {activos.length > 0 && (
         <View>
-          <Text style={styles.statusBanner}>⌛ Pedido en curso, sigue su estado aquí</Text>
+          <Text style={{ marginBottom: SPACING.sm, fontWeight: 'bold' }}>⌛ Pedido en curso, sigue su estado aquí</Text>
           {activos.map(o => {
             const idx = o.status ? STATUS_INDEX[o.status] ?? 0 : 0;
             const platosArray = mapPlatos(o.platos);
             const total = platosArray.reduce((s, i) => s + i.dish.price * i.quantity, 0);
 
             return (
-              <View key={o.id} style={styles.section}>
-                <Text style={styles.sectionTitle}>📦 Datos de tu pedido</Text>
-                <Text style={styles.detail}>🧾 Orden #{o.id}</Text>
-                <Text style={styles.detail}>💵 Total: ${total.toLocaleString()}</Text>
+              <View key={o.id} style={{ marginBottom: SPACING.lg, padding: SPACING.md, borderWidth: 1, borderColor: COLORS.grayLight, borderRadius: 10 }}>
+                <Text style={{ fontWeight: 'bold', marginBottom: SPACING.sm }}>📦 Orden #{o.id}</Text>
+                <Text>💵 Total: ${total.toLocaleString()}</Text>
 
-                <View style={styles.timelineCard}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginVertical: SPACING.md }}>
                   {STEPS.map((step, i) => {
                     const isActive = i <= idx;
                     return (
-                      <View key={step.key} style={styles.stepContainer}>
+                      <View key={step.key} style={{ alignItems: 'center', flex: 1 }}>
                         <MaterialCommunityIcons
                           name={step.icon as any}
                           size={28}
                           color={isActive ? COLORS.primary : COLORS.grayLight}
                         />
-                        <Text
-                          style={[
-                            styles.stepLabel,
-                            { color: isActive ? COLORS.primary : COLORS.grayDark },
-                          ]}
-                        >
+                        <Text style={{ color: isActive ? COLORS.primary : COLORS.grayDark, fontSize: 12, textAlign: 'center' }}>
                           {step.label}
                         </Text>
                       </View>
@@ -150,36 +149,35 @@ export default function Estado() {
                 </View>
 
                 {platosArray.map((i, index) => (
-                  <Text key={index} style={styles.detail}>
-                    🍽 {i.dish.name} ×{i.quantity}
-                  </Text>
+                  <Text key={index}>🍽 {i.dish.name} ×{i.quantity}</Text>
                 ))}
 
-                {o.notes && <Text style={styles.notes}>📋 Notas: {o.notes}</Text>}
+                {o.notes && <Text style={{ marginTop: SPACING.xs }}>📋 Notas: {o.notes}</Text>}
 
-                {/* ✅ Botón de ir a pagar */}
-                <TouchableOpacity
-                  style={{
-                    marginTop: SPACING.sm,
-                    backgroundColor: COLORS.primary,
-                    padding: SPACING.sm,
-                    borderRadius: 8,
-                    alignItems: 'center',
-                  }}
-                  onPress={() => {
-                    router.push({
-                      pathname: '/pago',
-                      params: {
-                        mesaId: mesa_id,
-                        sillaId: silla_id,
-                        userId: user_id,
-                        restauranteId: restaurante_id,
-                      },
-                    });
-                  }}
-                >
-                  <Text style={{ color: '#fff', fontWeight: 'bold' }}>Ir a pagar este pedido</Text>
-                </TouchableOpacity>
+                {!o.paid && (
+                  <TouchableOpacity
+                    style={{
+                      marginTop: SPACING.sm,
+                      backgroundColor: COLORS.primary,
+                      padding: SPACING.sm,
+                      borderRadius: 8,
+                      alignItems: 'center',
+                    }}
+                    onPress={() => {
+                      router.push({
+                        pathname: '/pago',
+                        params: {
+                          mesaId: mesa_id || o.mesa_id,
+                          sillaId: silla_id || o.silla_id,
+                          userId: user_id,
+                          restauranteId: restaurante_id,
+                        },
+                      });
+                    }}
+                  >
+                    <Text style={{ color: '#fff', fontWeight: 'bold' }}>Ir a pagar este pedido</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             );
           })}
@@ -188,7 +186,7 @@ export default function Estado() {
 
       {completados.length > 0 && (
         <>
-          <Text style={[styles.sectionTitle, { marginTop: SPACING.lg }]}>
+          <Text style={{ fontWeight: 'bold', marginTop: SPACING.lg, marginBottom: SPACING.sm }}>
             📚 Historial de pedidos
           </Text>
           {completados.map(o => {
@@ -196,8 +194,8 @@ export default function Estado() {
             const doneTime = new Date(o.created_at || 0).getTime() + (o.estimatedTime || 0) * 60 * 1000;
 
             return (
-              <View key={o.id} style={styles.historyCard}>
-                <Text style={styles.historyTitle}>
+              <View key={o.id} style={{ marginBottom: SPACING.md, padding: SPACING.md, backgroundColor: COLORS.grayLight, borderRadius: 10 }}>
+                <Text style={{ fontWeight: 'bold' }}>
                   Orden #{o.id} — completada a las {formatTime(doneTime)}
                 </Text>
                 {platosArray.map((i, ix) => (
@@ -211,11 +209,16 @@ export default function Estado() {
       )}
 
       {activos.length === 0 && completados.length === 0 && (
-        <Text style={styles.detail}>🕐 No hay pedidos registrados para esta mesa.</Text>
+        <Text>🕐 No hay pedidos registrados para esta mesa.</Text>
       )}
     </ScrollView>
   );
 }
+
+
+// Estilos se mantienen igual, asumiendo que los defines globalmente
+
+
 
 const styles = StyleSheet.create({
   container: {

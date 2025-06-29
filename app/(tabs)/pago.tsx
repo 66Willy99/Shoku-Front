@@ -26,7 +26,7 @@ export default function Pago() {
   const restaurante_id = String(params.restauranteId ?? '');
 
   const { carrito, notes, limpiarCarrito } = useCarrito();
-  const { orders, addOrder, markAsPaid } = useOrders();
+  const { orders, addOrder } = useOrders();
 
   const [method, setMethod] = useState<'efectivo' | 'tarjeta' | null>(null);
   const [waiterModal, setWaiterModal] = useState(false);
@@ -74,10 +74,10 @@ export default function Pago() {
   async function iniciarPagoWebpay(total: number, orderId: string) {
     try {
       const safeOrderId = String(orderId);
-
-
       console.log('🧾 Iniciando pago con orderId:', safeOrderId);
-      const payUrl = `${Config.API_URL}/pay?total=${total}&orderId=${encodeURIComponent(safeOrderId)}`;
+
+      const payUrl = `${Config.API_URL}/pay?total=${total}&orderId=${encodeURIComponent(safeOrderId)}&mesaId=${mesa_id}&sillaId=${silla_id}&userId=${user_id}&restauranteId=${restaurante_id}`;
+
 
       if (Platform.OS === 'web') {
         window.open(payUrl, '_blank');
@@ -93,8 +93,7 @@ export default function Pago() {
         const approved = String(queryParams?.approved) === 'true';
 
         if (approved) {
-          await markAsPaid(safeOrderId);
-          limpiarCarrito();
+          limpiarCarrito(); // ✅ Solo limpiar si fue aprobado
         }
 
         router.replace({
@@ -123,12 +122,10 @@ export default function Pago() {
     if (hasPendingOrder && lastUnpaidOrder) {
       const orderId = String(lastUnpaidOrder.id);
 
-
       if (method === 'tarjeta') {
         iniciarPagoWebpay(totalWithTip, orderId);
       } else {
-        await markAsPaid(orderId);
-        showWaiter();
+        showWaiter(); // El backend marcará como pagado si es efectivo
       }
     } else {
       try {
@@ -151,7 +148,6 @@ export default function Pago() {
         if (method === 'tarjeta') {
           iniciarPagoWebpay(totalWithTip, orderId);
         } else {
-          await markAsPaid(orderId);
           showWaiter();
         }
       } catch (err) {
@@ -222,6 +218,7 @@ export default function Pago() {
         </>
       )}
 
+      {/* Modal de confirmación */}
       <Modal visible={confirmModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
@@ -237,6 +234,7 @@ export default function Pago() {
         </View>
       </Modal>
 
+      {/* Modal del mesero */}
       <Modal visible={waiterModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
@@ -249,10 +247,7 @@ export default function Pago() {
   );
 }
 
-// Agrega tus estilos (styles.container, styles.itemText, etc.) como ya los tienes definidos en tu app
-
-
-
+// Puedes usar tus estilos ya definidos, o agregarlos aquí si necesitas.
 
 
 
