@@ -1,7 +1,7 @@
 // context/OrdersContext.tsx
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import axios from 'axios';
-import API_URL from '../lib/api';
+import { Config } from '@/constants/config';
 
 export type Order = {
   id: string;
@@ -54,12 +54,9 @@ export const OrdersProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const addOrder = async (orderData: NewOrder): Promise<string> => {
     try {
-      // Transformar al formato requerido por el backend
       const platosBackendFormat: Record<string, { cantidad: number }> = {};
       orderData.platos.forEach((plato) => {
-        platosBackendFormat[plato.id] = {
-          cantidad: plato.quantity,
-        };
+        platosBackendFormat[plato.id] = { cantidad: plato.quantity };
       });
 
       const payload = {
@@ -73,13 +70,11 @@ export const OrdersProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
       console.log('🛒 Enviando pedido al backend:', payload);
 
-      const res = await axios.post(`${API_URL}/pedido/`, payload, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      const res = await axios.post(`${Config.API_URL}/pedido/`, payload, {
+        headers: { 'Content-Type': 'application/json' },
       });
 
-      const orderId = res.data ?? crypto.randomUUID();
+      const orderId = String(res.data?.id ?? res.data ?? crypto.randomUUID());
 
       const newOrder: Order = {
         id: orderId,

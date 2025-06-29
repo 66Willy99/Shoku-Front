@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, ScrollView, Alert, StyleSheet,
+  View, Text, ScrollView, Alert, StyleSheet, TouchableOpacity,
 } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Order } from '../../context/OrdersContext';
 import { COLORS, FONT_SIZES, SPACING } from '../../theme';
-import API_URL from '../../lib/api';
+import { Config } from '@/constants/config';
 import { useMenu } from '../../context/MenuContext';
 import { Dish } from '../../context/MenuContext';
 
@@ -42,8 +42,8 @@ export default function Estado() {
     restaurante_id?: string;
   }>();
 
+  const router = useRouter();
   const { platos } = useMenu();
-
   const [orders, setOrders] = useState<Order[]>([]);
 
   useEffect(() => {
@@ -63,7 +63,7 @@ export default function Estado() {
     const fetchPedidos = async () => {
       try {
         const res = await fetch(
-          `${API_URL}/pedidos/?user_id=${user_id}&restaurante_id=${restaurante_id}`
+          `${Config.API_URL}/pedidos/?user_id=${user_id}&restaurante_id=${restaurante_id}`
         );
 
         if (!res.ok) {
@@ -101,14 +101,14 @@ export default function Estado() {
     new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   const mapPlatos = (platosObj: any) => {
-  return Object.entries(platosObj || {}).map(([platoId, info]: [string, any]) => {
-    const dish = platos.find((p: Dish) => p.id === platoId);
-    return {
-      dish: dish || { id: platoId, name: 'Plato desconocido', price: 0 },
-      quantity: info?.cantidad ?? 0,
-    };
-  });
-};
+    return Object.entries(platosObj || {}).map(([platoId, info]: [string, any]) => {
+      const dish = platos.find((p: Dish) => p.id === platoId);
+      return {
+        dish: dish || { id: platoId, name: 'Plato desconocido', price: 0 },
+        quantity: info?.cantidad ?? 0,
+      };
+    });
+  };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -118,7 +118,6 @@ export default function Estado() {
           {activos.map(o => {
             const idx = o.status ? STATUS_INDEX[o.status] ?? 0 : 0;
             const platosArray = mapPlatos(o.platos);
-
             const total = platosArray.reduce((s, i) => s + i.dish.price * i.quantity, 0);
 
             return (
@@ -157,6 +156,30 @@ export default function Estado() {
                 ))}
 
                 {o.notes && <Text style={styles.notes}>📋 Notas: {o.notes}</Text>}
+
+                {/* ✅ Botón de ir a pagar */}
+                <TouchableOpacity
+                  style={{
+                    marginTop: SPACING.sm,
+                    backgroundColor: COLORS.primary,
+                    padding: SPACING.sm,
+                    borderRadius: 8,
+                    alignItems: 'center',
+                  }}
+                  onPress={() => {
+                    router.push({
+                      pathname: '/pago',
+                      params: {
+                        mesaId: mesa_id,
+                        sillaId: silla_id,
+                        userId: user_id,
+                        restauranteId: restaurante_id,
+                      },
+                    });
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontWeight: 'bold' }}>Ir a pagar este pedido</Text>
+                </TouchableOpacity>
               </View>
             );
           })}
@@ -259,3 +282,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
