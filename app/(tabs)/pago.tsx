@@ -73,8 +73,12 @@ export default function Pago() {
 
   async function iniciarPagoWebpay(total: number, orderId: string) {
     try {
-      console.log('🧾 Iniciando pago con orderId:', orderId);
-      const payUrl = `${Config.API_URL}/pay?total=${total}&orderId=${encodeURIComponent(orderId)}`;
+      const safeOrderId = String(orderId);
+
+
+      console.log('🧾 Iniciando pago con orderId:', safeOrderId);
+      const payUrl = `${Config.API_URL}/pay?total=${total}&orderId=${encodeURIComponent(safeOrderId)}`;
+
       if (Platform.OS === 'web') {
         window.open(payUrl, '_blank');
         return;
@@ -89,7 +93,7 @@ export default function Pago() {
         const approved = String(queryParams?.approved) === 'true';
 
         if (approved) {
-          await markAsPaid(orderId);
+          await markAsPaid(safeOrderId);
           limpiarCarrito();
         }
 
@@ -117,7 +121,9 @@ export default function Pago() {
     setConfirmModal(false);
 
     if (hasPendingOrder && lastUnpaidOrder) {
-      const orderId = String(lastUnpaidOrder.id); // <-- aseguramos string plano
+      const orderId = String(lastUnpaidOrder.id);
+
+
       if (method === 'tarjeta') {
         iniciarPagoWebpay(totalWithTip, orderId);
       } else {
@@ -243,7 +249,8 @@ export default function Pago() {
   );
 }
 
-// styles no incluidos
+// Agrega tus estilos (styles.container, styles.itemText, etc.) como ya los tienes definidos en tu app
+
 
 
 

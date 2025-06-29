@@ -3,6 +3,11 @@ import React, { createContext, useContext, useState, ReactNode } from 'react';
 import axios from 'axios';
 import { Config } from '@/constants/config';
 
+// ✅ Generador de ID corto compatible con Webpay (< 26 caracteres)
+function generateShortId(): string {
+  return Math.random().toString(36).substring(2, 12).toUpperCase(); // ej: "A1B2C3D4E5"
+}
+
 export type Order = {
   id: string;
   user_id: string;
@@ -59,7 +64,11 @@ export const OrdersProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         platosBackendFormat[plato.id] = { cantidad: plato.quantity };
       });
 
+      // ✅ Generar ID antes de enviar al backend
+      const orderId = generateShortId();
+
       const payload = {
+        id: orderId,
         user_id: orderData.user_id,
         restaurante_id: orderData.restaurante_id,
         mesa_id: orderData.mesa_id,
@@ -70,11 +79,9 @@ export const OrdersProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
       console.log('🛒 Enviando pedido al backend:', payload);
 
-      const res = await axios.post(`${Config.API_URL}/pedido/`, payload, {
+      await axios.post(`${Config.API_URL}/pedido/`, payload, {
         headers: { 'Content-Type': 'application/json' },
       });
-
-      const orderId = String(res.data?.id ?? res.data ?? crypto.randomUUID());
 
       const newOrder: Order = {
         id: orderId,
