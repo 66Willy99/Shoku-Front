@@ -3,9 +3,8 @@ import React, { createContext, useContext, useState, ReactNode } from 'react';
 import axios from 'axios';
 import { Config } from '@/constants/config';
 
-// ✅ Generador de ID corto compatible con Webpay (< 26 caracteres)
 function generateShortId(): string {
-  return Math.random().toString(36).substring(2, 12).toUpperCase(); // ej: "A1B2C3D4E5"
+  return Math.random().toString(36).substring(2, 12).toUpperCase();
 }
 
 export type Order = {
@@ -21,11 +20,12 @@ export type Order = {
     quantity: number;
   }[];
   detalle: string;
-  paid: boolean;
+  estado_actual?: string;
   status?: string;
   created_at?: string;
   estimatedTime?: number;
   notes?: string;
+  paid?: boolean; // auxiliar, usado en frontend para mostrar pasos
 };
 
 type NewOrder = {
@@ -64,7 +64,6 @@ export const OrdersProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         platosBackendFormat[plato.id] = { cantidad: plato.quantity };
       });
 
-      // ✅ Generar ID antes de enviar al backend
       const orderId = generateShortId();
 
       const payload = {
@@ -92,10 +91,11 @@ export const OrdersProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         platos: orderData.platos,
         detalle: orderData.detalle,
         notes: orderData.detalle,
-        paid: false,
+        estado_actual: 'confirmado',
         status: 'confirmado',
         created_at: new Date().toISOString(),
         estimatedTime: 15,
+        // 🚫 No incluir paid aquí, solo se setea dinámicamente desde el backend o estado.tsx
       };
 
       setOrders((prev) => [...prev, newOrder]);
@@ -107,18 +107,9 @@ export const OrdersProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
-  const markAsPaid = async (orderId: string) => {
-    try {
-      setOrders((prev) =>
-        prev.map((order) =>
-          order.id === orderId ? { ...order, paid: true } : order
-        )
-      );
-      console.log(`✅ Pedido ${orderId} marcado como pagado.`);
-    } catch (err) {
-      console.error(`❌ Error al marcar el pedido ${orderId} como pagado:`, err);
-      throw err;
-    }
+  // Este método ya no se usa en la lógica actual
+  const markAsPaid = async (_orderId: string) => {
+    // vacío
   };
 
   return (
