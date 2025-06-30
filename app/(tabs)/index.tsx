@@ -13,26 +13,7 @@ import { useOrders } from '../../context/OrdersContext';
 
 export default function Home() {
   const router = useRouter();
-  const { mesa_id, silla_id, user_id, restaurante_id } = useLocalSearchParams<{
-    mesa_id?: string;
-    silla_id?: string;
-    user_id?: string;
-    restaurante_id?: string;
-  }>();
-
-  const defaultParams = {
-    mesa_id: '-OSpVJs33eQTSG0jnzjC',
-    silla_id: '-OSpVKS019LKyTsAgUsD',
-    user_id: 'qvTOrKKcnsNQfGQ5dd59YPm4xNf2',
-    restaurante_id: '-OOGlNS6j9ldiKwPB6zX',
-  };
-
-  const idParams = {
-    mesa_id: mesa_id ?? defaultParams.mesa_id,
-    silla_id: silla_id ?? defaultParams.silla_id,
-    user_id: user_id ?? defaultParams.user_id,
-    restaurante_id: restaurante_id ?? defaultParams.restaurante_id,
-  };
+  const { userId, restauranteId, mesaId, sillaId } = useLocalSearchParams();
 
   const [waiterModal, setWaiterModal] = useState(false);
   const { orders } = useOrders();
@@ -47,14 +28,24 @@ export default function Home() {
   const irACarta = () => {
     router.push({
       pathname: '/carta',
-      params: idParams,
+      params: {
+        userId,
+        restauranteId,
+        mesaId,
+        sillaId,
+      },
     });
   };
 
   const irAPago = () => {
     router.push({
       pathname: '/pago',
-      params: idParams,
+      params: {
+        userId,
+        restauranteId,
+        mesaId,
+        sillaId,
+      },
     });
   };
 

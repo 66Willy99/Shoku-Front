@@ -78,6 +78,7 @@ export const OrdersProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
       console.log('🛒 Enviando pedido al backend:', payload);
 
+
       await axios.post(`${Config.API_URL}/pedido/`, payload, {
         headers: { 'Content-Type': 'application/json' },
       });

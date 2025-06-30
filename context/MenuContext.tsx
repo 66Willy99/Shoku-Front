@@ -2,7 +2,7 @@
 
 import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
 import axios from 'axios';
-import API_URL from '../lib/api';
+import { Config } from '@/constants/config';
 
 // Tipo de plato
 export type Dish = {
@@ -33,7 +33,7 @@ export const MenuProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const fetchMenu = async () => {
     try {
-      const res = await axios.get(`${API_URL}/platos/`, {
+      const res = await axios.get(`${Config.API_URL}/platos/`, {
         params: {
           user_id: userId,
           restaurante_id: restauranteId,

@@ -15,36 +15,51 @@ import { Redirect } from "expo-router";
 import { Picker } from "@react-native-picker/picker";
 // @ts-ignore
 import {QRCodeSVG} from "qrcode.react";
+import { Config } from '@/constants/config';
+import LoadingScreen from '@/components/ui/LoadingScreen';
+
 
 export default function AdminScreen() {
     if (Platform.OS !== "web") {
             return <Redirect href="/" />;
         }
 
-    const [mesas, setMesas] = useState<{ id: string; numero: string | number; estado: string }[]>([]);
+    const [mesas, setMesas] = useState<{ id: string; numero: string | number; estado: string; capacidad: number }[]>([]);
     const [modalVisible, setModalVisible] = useState(false);
-    const [selectedMesa, setSelectedMesa] = useState<{ id: string; numero: string | number; estado: string } | null>(null);
+    const [selectedMesa, setSelectedMesa] = useState<{ id: string; numero: string | number; estado: string; capacidad: number } | null>(null);
     const [nuevoEstado, setNuevoEstado] = useState<string>("");
     const [sillas, setSillas] = useState<{ id: string; mesa_id: string }[]>([]);
     const [qrMesaId, setQrMesaId] = useState<string | null>(null);
     const [qrSillas, setQrSillas] = useState<{ id: string; mesa_id: string }[]>([]);
     const [qrVisible, setQrVisible] = useState(false);
     const slideAnim = useRef(new Animated.Value(-Dimensions.get("window").height)).current; // Empieza fuera de pantalla arriba
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
+    const user_id = localStorage.getItem("userId");
+    const restaurante_id = localStorage.getItem("restaurantId");
     useEffect(() => {
         const fetchMesas = async () => {
-            if (Platform.OS !== "web") return;
-            const user_id = localStorage.getItem("userId");
-            if (!user_id) return;
-            const restaurante_id = localStorage.getItem("restaurantId");
-            if (!user_id || !restaurante_id) return;
+            setIsSubmitting(true);
+            try{
+                if (Platform.OS !== "web") return;
+                const user_id = localStorage.getItem("userId");
+                if (!user_id) return;
+                const restaurante_id = localStorage.getItem("restaurantId");
+                if (!user_id || !restaurante_id) return;
 
-            const res = await fetch(`http://127.0.0.1:8000/mesa/all?user_id=${user_id}&restaurante_id=${restaurante_id}`);
-            const data = await res.json();
-            const mesasArray = Array.isArray(data.mesas)
-                ? data.mesas
-                : Object.keys(data.mesas).map((key) => ({ id: key, ...data.mesas[key] }));
-            setMesas(mesasArray);
+
+
+                const res = await fetch(`${Config.API_URL}/mesa/all?user_id=${user_id}&restaurante_id=${restaurante_id}`);
+                const data = await res.json();
+                const mesasArray = Array.isArray(data.mesas)
+                    ? data.mesas
+                    : Object.keys(data.mesas).map((key) => ({ id: key, ...data.mesas[key] }));
+                setMesas(mesasArray);
+            }catch (err){
+                console.error('Error al obtener mesas:', err);
+            }finally{
+                setIsSubmitting(false); 
+            }
         };
         fetchMesas();
     }, []);
@@ -54,13 +69,20 @@ export default function AdminScreen() {
             const user_id = localStorage.getItem("userId");
             const restaurante_id = localStorage.getItem("restaurantId");
             if (!user_id || !restaurante_id) return;
-            const res = await fetch(`http://127.0.0.1:8000/silla/all?user_id=${user_id}&restaurante_id=${restaurante_id}`);
+            setIsSubmitting(true);
+            try{
+            const res = await fetch(`${Config.API_URL}/silla/all?user_id=${user_id}&restaurante_id=${restaurante_id}`);
             const data = await res.json();
             // Ajusta según la estructura real de tu backend
             const sillasArray = Array.isArray(data.sillas)
                 ? data.sillas
                 : Object.keys(data.sillas).map((key) => ({ id: key, ...data.sillas[key] }));
             setSillas(sillasArray);
+            }catch(err){
+                console.error('Error al obtener sillas:', err);
+            }finally{
+                setIsSubmitting(false);
+            }
         };
         fetchSillas();
     }, []);
@@ -71,7 +93,7 @@ export default function AdminScreen() {
         }
     }, [selectedMesa]);
 
-    const openModal = (mesa: { id: string; numero: string | number; estado: string }) => {
+    const openModal = (mesa: { id: string; numero: string | number; estado: string; capacidad: number }) => {
         setSelectedMesa(mesa);
         setModalVisible(true);
         slideAnim.setValue(-Dimensions.get("window").height); // Arriba de la pantalla
@@ -99,19 +121,27 @@ export default function AdminScreen() {
         const restaurante_id = localStorage.getItem("restaurantId");
         const mesa_id = selectedMesa.id;
         if (!user_id || !restaurante_id) return;
-
-        await fetch("http://127.0.0.1:8000/mesa/", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                user_id,
-                restaurante_id,
-                mesa_id,
-                capacidad: 0,
-                estado: nuevoEstado,
-                numero: 0,
-            }),
-        });
+        setIsSubmitting(true);
+        console.log(selectedMesa);
+        console.log(`Actualizando estado de la mesa ${mesa_id} a ${nuevoEstado}`);
+        try{
+            await fetch(`${Config.API_URL}/mesa/`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    user_id: user_id,
+                    restaurante_id: restaurante_id,
+                    mesa_id: mesa_id,
+                    capacidad: selectedMesa.capacidad,
+                    estado: nuevoEstado,
+                    numero: selectedMesa.numero,
+                }),
+            });
+        }catch (err){
+            console.error('Error al obtener mesa:', err);
+        }finally{
+            setIsSubmitting(false);
+        }
 
         setMesas(prev =>
             prev.map(m =>
@@ -133,6 +163,10 @@ export default function AdminScreen() {
     }
 
     const estadosMesa = ["en preparacion", "disponible", "ocupado", "terminado", "pagado"];
+
+    if (isSubmitting) {
+        return (<LoadingScreen message="Cargando mesas..." />);
+    } 
 
     return (
         <View style={styles.container}>
@@ -270,7 +304,7 @@ export default function AdminScreen() {
                             ) : (
                                 qrSillas.map((silla) => (
                                     <View key={silla.id} style={{ marginBottom: 24, alignItems: "center" }}>
-                                        <QRCodeSVG value={`http://192.168.1.87:8081/${qrMesaId}/${silla.id}`}/>
+                                        <QRCodeSVG value={`${Config.APP_URL}/${user_id}/${restaurante_id}/${qrMesaId}/${silla.id}`}/>
                                         <Text style={{ color: "#333", marginBottom: 4, textAlign: "center" }}>
                                             Silla ID: {silla.id}
                                         </Text>
