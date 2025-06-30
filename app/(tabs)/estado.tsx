@@ -1,38 +1,41 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, ScrollView, Alert, StyleSheet,
+  View, Text, ScrollView, Alert, TouchableOpacity, StyleSheet
 } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Order } from '../../context/OrdersContext';
-import { COLORS, FONT_SIZES, SPACING } from '../../theme';
+
+import { COLORS, SPACING, FONT_SIZES } from '../../theme';
 import { Config } from '@/constants/config';
 import { useMenu } from '../../context/MenuContext';
 import { Dish } from '../../context/MenuContext';
 
 const STEPS = [
-  { key: 'confirmed', icon: 'check-circle', label: 'Pedido confirmado' },
-  { key: 'preparing', icon: 'silverware-fork-knife', label: 'En preparación' },
-  { key: 'finished', icon: 'clock-end', label: 'Terminado' },
-  { key: 'delivered', icon: 'food-fork-drink', label: 'Entregado' },
+  { key: 'pagado', icon: 'credit-card-check', label: 'Pagado' },
+  { key: 'confirmado', icon: 'check-circle', label: 'Pedido confirmado' },
+  { key: 'en progreso', icon: 'silverware-fork-knife', label: 'En preparación' },
+  { key: 'listo', icon: 'clock-end', label: 'Terminado' },
+  { key: 'entregado', icon: 'food-fork-drink', label: 'Entregado' },
 ];
 
 const STATUS_INDEX: Record<string, number> = {
-  'confirmado': 0,
-  'en progreso': 1,
-  'listo': 2,
-  'completado': 3,
-  'entregado': 3,
+  'pagado': 0,
+  'confirmado': 1,
+  'en progreso': 2,
+  'listo': 3,
+  'entregado': 4,
+  'completado': 4,
 };
 
 export default function Estado() {
   const {
     mesa_id,
     silla_id,
-    token_ws,
-    approved,
     user_id,
     restaurante_id,
+    token_ws,
+    approved,
   } = useLocalSearchParams<{
     mesa_id?: string;
     silla_id?: string;
@@ -42,12 +45,12 @@ export default function Estado() {
     restaurante_id?: string;
   }>();
 
+  const router = useRouter();
   const { platos } = useMenu();
-
   const [orders, setOrders] = useState<Order[]>([]);
 
   useEffect(() => {
-    if (token_ws) {
+    if (token_ws && approved !== undefined) {
       Alert.alert(
         approved === 'true' ? '✅ Pago aprobado' : '❌ Pago rechazado',
         approved === 'true'
@@ -58,91 +61,109 @@ export default function Estado() {
   }, [token_ws]);
 
   useEffect(() => {
-    if (!user_id || !restaurante_id) return;
+    if (!user_id || !restaurante_id) {
+      Alert.alert("Error", "Faltan datos de usuario o restaurante");
+      return;
+    }
 
     const fetchPedidos = async () => {
       try {
         const res = await fetch(
           `${Config.API_URL}/pedidos/?user_id=${user_id}&restaurante_id=${restaurante_id}`
         );
-
-        if (!res.ok) {
-          console.error('Error en la respuesta del servidor:', res.status);
-          return;
-        }
+        if (!res.ok) return;
 
         const data = await res.json();
-        console.log('📦 Pedidos recibidos:', data);
-
         if (data && data.pedidos) {
-          const pedidosArray: Order[] = Object.entries(data.pedidos).map(([id, pedido]: [string, any]) => ({
-            ...pedido,
-            id,
-          }));
+          const pedidosArray: Order[] = Object.entries(data.pedidos).map(
+            ([id, pedido]: [string, any]) => {
+              const estado = (
+                pedido.estado_actual || 
+                pedido.estados?.estado_actual || 
+                'confirmado'
+              ).toLowerCase();
+
+              return {
+                ...pedido,
+                id,
+                estado_actual: estado,
+                status: estado,
+                paid: estado === 'pagado',
+              };
+            }
+          );
           setOrders(pedidosArray);
-        } else {
-          console.warn('La respuesta no contiene pedidos válidos:', data);
-          setOrders([]);
         }
-      } catch (error) {
-        console.error('Error al cargar pedidos:', error);
+      } catch (err) {
+        console.error("❌ Error al obtener pedidos:", err);
       }
     };
 
     fetchPedidos();
-    const interval = setInterval(fetchPedidos, 10000);
+    const interval = setInterval(fetchPedidos, 8000);
     return () => clearInterval(interval);
   }, [user_id, restaurante_id]);
 
-  const activos = orders.filter(o => o.status !== 'completado' && o.status !== 'entregado');
-  const completados = orders.filter(o => o.status === 'completado' || o.status === 'entregado');
+  const activos = orders.filter(o =>
+    !['entregado', 'completado'].includes(o.status || '')
+  );
+
+  const completados = orders.filter(o =>
+    ['entregado', 'completado'].includes(o.status || '')
+  );
 
   const formatTime = (ms: number) =>
     new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-  const mapPlatos = (platosObj: any) => {
-  return Object.entries(platosObj || {}).map(([platoId, info]: [string, any]) => {
-    const dish = platos.find((p: Dish) => p.id === platoId);
-    return {
-      dish: dish || { id: platoId, name: 'Plato desconocido', price: 0 },
-      quantity: info?.cantidad ?? 0,
-    };
-  });
-};
+  const mapPlatos = (platosObj: any) =>
+    Object.entries(platosObj || {}).map(([id, info]: [string, any]) => {
+      const dish = platos.find((p: Dish) => p.id === id);
+      return {
+        dish: dish || { id, name: 'Plato desconocido', price: 0 },
+        quantity: info?.cantidad ?? 0
+      };
+    });
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView contentContainerStyle={{ padding: SPACING.md }}>
       {activos.length > 0 && (
         <View>
-          <Text style={styles.statusBanner}>⌛ Pedido en curso, sigue su estado aquí</Text>
+          <Text style={{ marginBottom: SPACING.sm, fontWeight: 'bold' }}>
+            ⌛ Pedido en curso, sigue su estado aquí
+          </Text>
           {activos.map(o => {
-            const idx = o.status ? STATUS_INDEX[o.status] ?? 0 : 0;
+            const idx = o.status && o.status in STATUS_INDEX ? STATUS_INDEX[o.status] : 0;
             const platosArray = mapPlatos(o.platos);
-
             const total = platosArray.reduce((s, i) => s + i.dish.price * i.quantity, 0);
+            const stepsToShow = o.paid ? STEPS : STEPS.slice(1);
 
             return (
-              <View key={o.id} style={styles.section}>
-                <Text style={styles.sectionTitle}>📦 Datos de tu pedido</Text>
-                <Text style={styles.detail}>🧾 Orden #{o.id}</Text>
-                <Text style={styles.detail}>💵 Total: ${total.toLocaleString()}</Text>
+              <View key={o.id} style={{
+                marginBottom: SPACING.lg,
+                padding: SPACING.md,
+                borderWidth: 1,
+                borderColor: COLORS.grayLight,
+                borderRadius: 10
+              }}>
+                <Text style={{ fontWeight: 'bold', marginBottom: SPACING.sm }}>📦 Orden #{o.id}</Text>
+                <Text>💵 Total: ${total.toLocaleString()}</Text>
 
-                <View style={styles.timelineCard}>
-                  {STEPS.map((step, i) => {
-                    const isActive = i <= idx;
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginVertical: SPACING.md }}>
+                  {stepsToShow.map((step, i) => {
+                    const stepIndex = o.paid ? i : i + 1;
+                    const isActive = stepIndex <= idx;
                     return (
-                      <View key={step.key} style={styles.stepContainer}>
+                      <View key={step.key} style={{ alignItems: 'center', flex: 1 }}>
                         <MaterialCommunityIcons
                           name={step.icon as any}
                           size={28}
                           color={isActive ? COLORS.primary : COLORS.grayLight}
                         />
-                        <Text
-                          style={[
-                            styles.stepLabel,
-                            { color: isActive ? COLORS.primary : COLORS.grayDark },
-                          ]}
-                        >
+                        <Text style={{
+                          color: isActive ? COLORS.primary : COLORS.grayDark,
+                          fontSize: 12,
+                          textAlign: 'center'
+                        }}>
                           {step.label}
                         </Text>
                       </View>
@@ -151,12 +172,33 @@ export default function Estado() {
                 </View>
 
                 {platosArray.map((i, index) => (
-                  <Text key={index} style={styles.detail}>
-                    🍽 {i.dish.name} ×{i.quantity}
-                  </Text>
+                  <Text key={index}>🍽 {i.dish.name} ×{i.quantity}</Text>
                 ))}
 
-                {o.notes && <Text style={styles.notes}>📋 Notas: {o.notes}</Text>}
+                {!o.paid && (
+                  <TouchableOpacity
+                    style={{
+                      marginTop: SPACING.sm,
+                      backgroundColor: COLORS.primary,
+                      padding: SPACING.sm,
+                      borderRadius: 8,
+                      alignItems: 'center',
+                    }}
+                    onPress={() => {
+                      router.push({
+                        pathname: '/pago',
+                        params: {
+                          mesaId: mesa_id ?? o.mesa_id ?? '',
+                          sillaId: silla_id ?? o.silla_id ?? '',
+                          userId: user_id ?? '',
+                          restauranteId: restaurante_id ?? '',
+                        },
+                      });
+                    }}
+                  >
+                    <Text style={{ color: '#fff', fontWeight: 'bold' }}>Ir a pagar este pedido</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             );
           })}
@@ -165,7 +207,11 @@ export default function Estado() {
 
       {completados.length > 0 && (
         <>
-          <Text style={[styles.sectionTitle, { marginTop: SPACING.lg }]}>
+          <Text style={{
+            fontWeight: 'bold',
+            marginTop: SPACING.lg,
+            marginBottom: SPACING.sm
+          }}>
             📚 Historial de pedidos
           </Text>
           {completados.map(o => {
@@ -173,8 +219,13 @@ export default function Estado() {
             const doneTime = new Date(o.created_at || 0).getTime() + (o.estimatedTime || 0) * 60 * 1000;
 
             return (
-              <View key={o.id} style={styles.historyCard}>
-                <Text style={styles.historyTitle}>
+              <View key={o.id} style={{
+                marginBottom: SPACING.md,
+                padding: SPACING.md,
+                backgroundColor: COLORS.grayLight,
+                borderRadius: 10
+              }}>
+                <Text style={{ fontWeight: 'bold' }}>
                   Orden #{o.id} — completada a las {formatTime(doneTime)}
                 </Text>
                 {platosArray.map((i, ix) => (
@@ -188,11 +239,16 @@ export default function Estado() {
       )}
 
       {activos.length === 0 && completados.length === 0 && (
-        <Text style={styles.detail}>🕐 No hay pedidos registrados para esta mesa.</Text>
+        <Text>🕐 No hay pedidos registrados para esta mesa.</Text>
       )}
     </ScrollView>
   );
 }
+
+
+
+
+// despues viene los tylesheet asi que no es necesario que los generes a menos que hagas unos nuevos si es necesario
 
 const styles = StyleSheet.create({
   container: {
@@ -259,3 +315,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+

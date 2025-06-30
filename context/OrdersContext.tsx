@@ -3,6 +3,10 @@ import React, { createContext, useContext, useState, ReactNode } from 'react';
 import axios from 'axios';
 import { Config } from '@/constants/config';
 
+function generateShortId(): string {
+  return Math.random().toString(36).substring(2, 12).toUpperCase();
+}
+
 export type Order = {
   id: string;
   user_id: string;
@@ -16,11 +20,12 @@ export type Order = {
     quantity: number;
   }[];
   detalle: string;
-  paid: boolean;
+  estado_actual?: string;
   status?: string;
   created_at?: string;
   estimatedTime?: number;
   notes?: string;
+  paid?: boolean; // auxiliar, usado en frontend para mostrar pasos
 };
 
 type NewOrder = {
@@ -54,15 +59,15 @@ export const OrdersProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const addOrder = async (orderData: NewOrder): Promise<string> => {
     try {
-      // Transformar al formato requerido por el backend
       const platosBackendFormat: Record<string, { cantidad: number }> = {};
       orderData.platos.forEach((plato) => {
-        platosBackendFormat[plato.id] = {
-          cantidad: plato.quantity,
-        };
+        platosBackendFormat[plato.id] = { cantidad: plato.quantity };
       });
 
+      const orderId = generateShortId();
+
       const payload = {
+        id: orderId,
         user_id: orderData.user_id,
         restaurante_id: orderData.restaurante_id,
         mesa_id: orderData.mesa_id,
@@ -73,13 +78,10 @@ export const OrdersProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
       console.log('🛒 Enviando pedido al backend:', payload);
 
-      const res = await axios.post(`${Config.API_URL}/pedido/`, payload, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
 
-      const orderId = res.data ?? crypto.randomUUID();
+      await axios.post(`${Config.API_URL}/pedido/`, payload, {
+        headers: { 'Content-Type': 'application/json' },
+      });
 
       const newOrder: Order = {
         id: orderId,
@@ -90,10 +92,11 @@ export const OrdersProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         platos: orderData.platos,
         detalle: orderData.detalle,
         notes: orderData.detalle,
-        paid: false,
+        estado_actual: 'confirmado',
         status: 'confirmado',
         created_at: new Date().toISOString(),
         estimatedTime: 15,
+        // 🚫 No incluir paid aquí, solo se setea dinámicamente desde el backend o estado.tsx
       };
 
       setOrders((prev) => [...prev, newOrder]);
@@ -105,18 +108,9 @@ export const OrdersProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
-  const markAsPaid = async (orderId: string) => {
-    try {
-      setOrders((prev) =>
-        prev.map((order) =>
-          order.id === orderId ? { ...order, paid: true } : order
-        )
-      );
-      console.log(`✅ Pedido ${orderId} marcado como pagado.`);
-    } catch (err) {
-      console.error(`❌ Error al marcar el pedido ${orderId} como pagado:`, err);
-      throw err;
-    }
+  // Este método ya no se usa en la lógica actual
+  const markAsPaid = async (_orderId: string) => {
+    // vacío
   };
 
   return (

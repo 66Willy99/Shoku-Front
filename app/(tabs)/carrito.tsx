@@ -30,7 +30,7 @@ export default function Carrito() {
   };
 
   const confirmarPedido = async () => {
-    if (!mesaId || !sillaId) {
+    if (!mesaId || !sillaId || !userId || !restauranteId) {
       Alert.alert('Error', 'Faltan datos para enviar el pedido.');
       return;
     }
@@ -53,6 +53,7 @@ export default function Carrito() {
 
       limpiarCarrito();
 
+      // ✅ Navegación hacia /estado con parámetros completos
       router.replace({
         pathname: '/estado',
         params: {
@@ -119,7 +120,7 @@ export default function Carrito() {
           <TouchableOpacity
             style={styles.emptyButton}
             onPress={() => {
-              if (mesaId && sillaId) {
+              if (mesaId && sillaId && userId && restauranteId) {
                 router.push({
                   pathname: '/carta',
                   params: { mesa_id: mesaId, silla_id: sillaId, user_id: userId, restaurante_id: restauranteId },
@@ -163,7 +164,6 @@ export default function Carrito() {
   );
 }
 
-// despues viene los stylesheet
 const styles = StyleSheet.create({
   container: { flex: 1, padding: SPACING.md, backgroundColor: COLORS.background },
   header: { fontSize: FONT_SIZES.subtitle, fontWeight: 'bold', marginBottom: SPACING.md, textAlign: 'center', color: COLORS.primary },

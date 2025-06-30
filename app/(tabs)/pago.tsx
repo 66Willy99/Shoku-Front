@@ -1,17 +1,15 @@
-// app/(tabs)/pago.tsx
 import React, { useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet,
-  Alert, Switch, Modal, Platform
+  View, Text, TouchableOpacity, Alert, Switch, Modal, Platform, StyleSheet
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { useCarrito } from '../../context/CarritoContext';
 import { useOrders } from '../../context/OrdersContext';
-import { COLORS, FONT_SIZES, SPACING } from '../../theme';
 import { Config } from '../../constants/config';
 import { Dish } from '../../context/MenuContext';
+import { COLORS, FONT_SIZES, SPACING } from '../../theme';
 
 type CartItem = {
   dish: Dish;
@@ -20,30 +18,24 @@ type CartItem = {
 
 export default function Pago() {
   const router = useRouter();
-  const {
-    mesa_id,
-    silla_id,
-    user_id,
-    restaurante_id,
-  } = useLocalSearchParams<{
-    mesa_id?: string;
-    silla_id?: string;
-    user_id?: string;
-    restaurante_id?: string;
-  }>();
+  const params = useLocalSearchParams();
 
-  if (!mesa_id || !silla_id) {
-    Alert.alert('Error', 'Faltan los parámetros de mesa o silla en la URL');
-    return <Text style={{ padding: 20 }}>Error: Faltan mesa_id o silla_id</Text>;
-  }
+  const mesa_id = String(params.mesaId ?? '');
+  const silla_id = String(params.sillaId ?? '');
+  const user_id = String(params.userId ?? '');
+  const restaurante_id = String(params.restauranteId ?? '');
 
   const { carrito, notes, limpiarCarrito } = useCarrito();
-  const { orders, addOrder, markAsPaid } = useOrders();
+  const { orders, addOrder } = useOrders();
 
   const [method, setMethod] = useState<'efectivo' | 'tarjeta' | null>(null);
   const [waiterModal, setWaiterModal] = useState(false);
   const [tipIncluded, setTipIncluded] = useState(true);
   const [confirmModal, setConfirmModal] = useState(false);
+
+  if (!mesa_id || !silla_id || !user_id || !restaurante_id) {
+    return <Text style={{ padding: 20 }}>❌ Favor seleccionar un pedido válido</Text>;
+  }
 
   const lastUnpaidOrder = orders.findLast(o => !o.paid);
   const hasPendingOrder = carrito.length === 0 && !!lastUnpaidOrder;
@@ -62,10 +54,10 @@ export default function Pago() {
   const notesToShow = carrito.length > 0 ? notes : lastUnpaidOrder?.notes ?? '';
   const hasItems = items.length > 0;
 
-  const subtotal = items.reduce((s, i) => s + i.dish.price * i.quantity, 0);
+  const subtotal = items.reduce((sum, i) => sum + i.dish.price * i.quantity, 0);
   const tipAmount = tipIncluded ? Math.round(subtotal * 0.1) : 0;
   const totalWithTip = subtotal + tipAmount;
-  const estimatedTime = items.reduce((s, i) => s + i.quantity * 3, 0);
+  const estimatedTime = items.reduce((sum, i) => sum + i.quantity * 3, 0);
 
   const showWaiter = () => {
     setWaiterModal(true);
@@ -74,19 +66,19 @@ export default function Pago() {
       limpiarCarrito();
       router.replace({
         pathname: '/estado',
-        params: {
-          mesa_id,
-          silla_id,
-          user_id,
-          restaurante_id
-        },
+        params: { mesaId: mesa_id, sillaId: silla_id, userId: user_id, restauranteId: restaurante_id },
       });
     }, 2000);
   };
 
   async function iniciarPagoWebpay(total: number, orderId: string) {
     try {
-      const payUrl = `${Config.API_URL}/pay?total=${total}&orderId=${orderId}`;
+      const safeOrderId = String(orderId);
+      console.log('🧾 Iniciando pago con orderId:', safeOrderId);
+
+      const payUrl = `${Config.API_URL}/pay?total=${total}&orderId=${encodeURIComponent(safeOrderId)}&mesaId=${mesa_id}&sillaId=${silla_id}&userId=${user_id}&restauranteId=${restaurante_id}`;
+
+
       if (Platform.OS === 'web') {
         window.open(payUrl, '_blank');
         return;
@@ -101,13 +93,19 @@ export default function Pago() {
         const approved = String(queryParams?.approved) === 'true';
 
         if (approved) {
-          await markAsPaid(orderId);
-          limpiarCarrito();
+          limpiarCarrito(); // ✅ Solo limpiar si fue aprobado
         }
 
         router.replace({
           pathname: '/estado',
-          params: { mesa_id, silla_id, user_id, restaurante_id, token_ws, approved: String(approved) },
+          params: {
+            mesaId: mesa_id,
+            sillaId: silla_id,
+            userId: user_id,
+            restauranteId: restaurante_id,
+            token_ws,
+            approved: String(approved),
+          },
         });
       } else {
         Alert.alert('Pago cancelado', 'No se completó la transacción.');
@@ -122,32 +120,39 @@ export default function Pago() {
     setConfirmModal(false);
 
     if (hasPendingOrder && lastUnpaidOrder) {
-      if (method === 'tarjeta') {
-        iniciarPagoWebpay(totalWithTip, lastUnpaidOrder.id);
-      } else {
-        await markAsPaid(lastUnpaidOrder.id);
-        showWaiter();
-      }
-    } else {
-      const newOrderId = await addOrder({
-        user_id: user_id?.toString() ?? 'qvTOrKKcnsNQfGQ5dd59YPm4xNf2',
-        restaurante_id: restaurante_id?.toString() ?? '-OOGlNS6j9ldiKwPB6zX',
-        mesa_id: mesa_id.toString(),
-        silla_id: silla_id.toString(),
-        platos: items.map(item => ({
-          id: item.dish.id,
-          name: item.dish.name,
-          price: item.dish.price,
-          quantity: item.quantity,
-        })),
-        detalle: notesToShow,
-      });
+      const orderId = String(lastUnpaidOrder.id);
 
       if (method === 'tarjeta') {
-        iniciarPagoWebpay(totalWithTip, newOrderId);
+        iniciarPagoWebpay(totalWithTip, orderId);
       } else {
-        await markAsPaid(newOrderId);
-        showWaiter();
+        showWaiter(); // El backend marcará como pagado si es efectivo
+      }
+    } else {
+      try {
+        const orderId = await addOrder({
+          user_id,
+          restaurante_id,
+          mesa_id,
+          silla_id,
+          platos: items.map(item => ({
+            id: item.dish.id,
+            name: item.dish.name,
+            price: item.dish.price,
+            quantity: item.quantity,
+          })),
+          detalle: notesToShow,
+        });
+
+        console.log('🧾 Pedido generado con ID:', orderId);
+
+        if (method === 'tarjeta') {
+          iniciarPagoWebpay(totalWithTip, orderId);
+        } else {
+          showWaiter();
+        }
+      } catch (err) {
+        console.error('❌ Error al confirmar pedido:', err);
+        Alert.alert('Error', 'No se pudo confirmar el pedido');
       }
     }
   };
@@ -161,6 +166,7 @@ export default function Pago() {
   return (
     <View style={styles.container}>
       <Text style={styles.header}>PAGO</Text>
+
       {!hasItems ? (
         <Text style={styles.emptyText}>No hay productos en el carrito</Text>
       ) : (
@@ -212,6 +218,7 @@ export default function Pago() {
         </>
       )}
 
+      {/* Modal de confirmación */}
       <Modal visible={confirmModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
@@ -227,6 +234,7 @@ export default function Pago() {
         </View>
       </Modal>
 
+      {/* Modal del mesero */}
       <Modal visible={waiterModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
@@ -239,8 +247,7 @@ export default function Pago() {
   );
 }
 
-
-// despues viene los stylesheet
+// Puedes usar tus estilos ya definidos, o agregarlos aquí si necesitas.
 
 
 
@@ -265,4 +272,3 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: FONT_SIZES.subtitle, fontWeight: 'bold', marginBottom: SPACING.sm },
   modalMsg: { fontSize: FONT_SIZES.body, color: COLORS.grayDark },
 });
-                                      
