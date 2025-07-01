@@ -5,8 +5,9 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Order } from '../../context/OrdersContext';
+
 import { COLORS, SPACING, FONT_SIZES } from '../../theme';
-import { Config } from '@/constants/config';
+import { Config } from '../../constants/config';
 import { useMenu } from '../../context/MenuContext';
 import { Dish } from '../../context/MenuContext';
 
@@ -136,6 +137,9 @@ export default function Estado() {
             const total = platosArray.reduce((s, i) => s + i.dish.price * i.quantity, 0);
             const stepsToShow = o.paid ? STEPS : STEPS.slice(1);
 
+            const estadosCompletos = ['confirmado', 'en progreso', 'listo', 'entregado'];
+            const pedidoListoParaPagar = estadosCompletos.every(e => o.estados?.[e]);
+
             return (
               <View key={o.id} style={{
                 marginBottom: SPACING.lg,
@@ -174,7 +178,7 @@ export default function Estado() {
                   <Text key={index}>🍽 {i.dish.name} ×{i.quantity}</Text>
                 ))}
 
-                {!o.paid && (
+                {pedidoListoParaPagar && !o.paid && (
                   <TouchableOpacity
                     style={{
                       marginTop: SPACING.sm,
@@ -243,6 +247,7 @@ export default function Estado() {
     </ScrollView>
   );
 }
+
 
 
 

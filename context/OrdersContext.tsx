@@ -1,7 +1,7 @@
 // context/OrdersContext.tsx
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import axios from 'axios';
-import { Config } from '@/constants/config';
+import { Config } from '../constants/config';
 
 function generateShortId(): string {
   return Math.random().toString(36).substring(2, 12).toUpperCase();
@@ -25,7 +25,8 @@ export type Order = {
   created_at?: string;
   estimatedTime?: number;
   notes?: string;
-  paid?: boolean; // auxiliar, usado en frontend para mostrar pasos
+  paid?: boolean;
+  estados?: { [key: string]: any }; // ✅ agregado para evitar error ts(2339)
 };
 
 type NewOrder = {
@@ -95,7 +96,6 @@ export const OrdersProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         status: 'confirmado',
         created_at: new Date().toISOString(),
         estimatedTime: 15,
-        // 🚫 No incluir paid aquí, solo se setea dinámicamente desde el backend o estado.tsx
       };
 
       setOrders((prev) => [...prev, newOrder]);
@@ -107,9 +107,8 @@ export const OrdersProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
-  // Este método ya no se usa en la lógica actual
   const markAsPaid = async (_orderId: string) => {
-    // vacío
+    // método ya no utilizado
   };
 
   return (
