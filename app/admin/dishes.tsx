@@ -9,6 +9,7 @@ import Icon from 'react-native-vector-icons/FontAwesome';
 import LoadingScreen from '@/components/ui/LoadingScreen'; 
 import Swal from 'sweetalert2';
 import { useSweetAlertWatcher } from '@/hooks/sweetAlertWatcher';
+import { useSubscription } from '@/context/subscriptionContext';
 
 
 type Plato = {
@@ -30,6 +31,7 @@ export default function PlatosScreen() {
     const [CatId, setCatId] = useState<string | null>(null);
     const [formValues, setFormValues] = useState<Plato>({ nombre: '', descripcion: '', precio: 0, stock: 0, categoria_id: '' });
     const [showPage, setShowPage] = useState(true);
+    const { puedeCrearPlato, limites } = useSubscription();
 
     const formOpacity = useRef(new Animated.Value(0)).current;
 
@@ -66,6 +68,14 @@ export default function PlatosScreen() {
     }, []);
 
     const handleOpenCreate = () => {
+        if (!puedeCrearPlato(Object.keys(platos).length)) {
+            Swal.fire({
+                title: 'Límite alcanzado',
+                text: `Tu plan actual solo permite hasta ${limites.platos} platos.`,
+                icon: 'warning',
+            });
+            return;
+        }
         setIsCreating(true);
         setSelectedPlatoId(null);
         setFormValues({ nombre: '', descripcion: '', precio: 0, stock: 0, categoria_id: '' });
