@@ -8,6 +8,7 @@ import BoldText from '@/components/ui/CustomText';
 import { saveSession } from '../../services/sessionService'; 
 import { Config } from '../../constants/config';
 import LoadingScreen from '@/components/ui/LoadingScreen';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 const LoginScreen = () => {
@@ -66,6 +67,23 @@ const handleLogin = async () => {
         const restaurantIds = Object.keys(restaurantes);
 
         console.log('Restaurantes:', restaurantIds);
+
+        const Nivelresponse = await fetch(`${API_URL}/user/?userId=${loginData.localId}`);
+        
+        if (!Nivelresponse.ok) {
+            throw new Error('Error al obtener el usuario para el nivel');
+        }
+
+        const data = await Nivelresponse.json();
+        const nivel = data[loginData.localId];
+
+        if (!nivel || nivel.nivel === undefined) {
+            throw new Error('Nivel no encontrado en la respuesta');
+        }
+        
+        console.log(nivel);
+
+        AsyncStorage.setItem("Nivel", nivel.nivel as string);
 
         await login(loginData.localId, restaurantIds[0] || undefined);
 
