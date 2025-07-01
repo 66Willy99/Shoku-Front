@@ -11,12 +11,7 @@ import { COLORS, FONT_SIZES, SPACING } from '../../theme';
 
 export default function Carrito() {
   const router = useRouter();
-  const { userId, restauranteId, mesaId, sillaId } = useLocalSearchParams<{
-    userId?: string;
-    restauranteId?: string;
-    mesaId?: string;
-    sillaId?: string;
-  }>();
+  const { userId, restauranteId, mesaId, sillaId } = useLocalSearchParams();
 
   const { carrito, notes, setNotes, removeProducto, limpiarCarrito, total } = useCarrito();
   const { addOrder } = useOrders();
@@ -42,12 +37,11 @@ export default function Carrito() {
 
     try {
       setShowConfirmModal(false);
-
       await addOrder({
-        user_id: userId.toString(),
-        restaurante_id: restauranteId.toString(),
-        mesa_id: mesaId.toString(),
-        silla_id: sillaId.toString(),
+        user_id: userId?.toString(),
+        restaurante_id: restauranteId?.toString(),
+        mesa_id: mesaId?.toString(),
+        silla_id: sillaId?.toString(),
         platos: carrito.map(item => ({
           id: item.dish.id,
           name: item.dish.name,
@@ -129,12 +123,7 @@ export default function Carrito() {
               if (mesaId && sillaId && userId && restauranteId) {
                 router.push({
                   pathname: '/carta',
-                  params: {
-                    mesa_id: mesaId,
-                    silla_id: sillaId,
-                    user_id: userId,
-                    restaurante_id: restauranteId,
-                  },
+                  params: { mesa_id: mesaId, silla_id: sillaId, user_id: userId, restaurante_id: restauranteId },
                 });
               } else {
                 router.push('/carta');
