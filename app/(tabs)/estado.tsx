@@ -5,7 +5,6 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Order } from '../../context/OrdersContext';
-
 import { COLORS, SPACING, FONT_SIZES } from '../../theme';
 import { Config } from '../../constants/config';
 import { useMenu } from '../../context/MenuContext';
@@ -14,16 +13,16 @@ import { Dish } from '../../context/MenuContext';
 const STEPS = [
   { key: 'pagado', icon: 'credit-card-check', label: 'Pagado' },
   { key: 'confirmado', icon: 'check-circle', label: 'Pedido confirmado' },
-  { key: 'en progreso', icon: 'silverware-fork-knife', label: 'En preparación' },
-  { key: 'listo', icon: 'clock-end', label: 'Terminado' },
+  { key: 'preparacion', icon: 'silverware-fork-knife', label: 'En preparación' },
+  { key: 'terminado', icon: 'clock-end', label: 'Terminado' },
   { key: 'entregado', icon: 'food-fork-drink', label: 'Entregado' },
 ];
 
 const STATUS_INDEX: Record<string, number> = {
   'pagado': 0,
   'confirmado': 1,
-  'en progreso': 2,
-  'listo': 3,
+  'preparacion': 2,
+  'terminado': 3,
   'entregado': 4,
   'completado': 4,
 };
@@ -137,7 +136,7 @@ export default function Estado() {
             const total = platosArray.reduce((s, i) => s + i.dish.price * i.quantity, 0);
             const stepsToShow = o.paid ? STEPS : STEPS.slice(1);
 
-            const estadosCompletos = ['confirmado', 'en progreso', 'listo', 'entregado'];
+            const estadosCompletos = ['confirmado', 'preparacion', 'terminado', 'entregado'];
             const pedidoListoParaPagar = estadosCompletos.every(e => o.estados?.[e]);
 
             return (
@@ -179,6 +178,8 @@ export default function Estado() {
                 ))}
 
                 {pedidoListoParaPagar && !o.paid && (
+
+
                   <TouchableOpacity
                     style={{
                       marginTop: SPACING.sm,
@@ -247,9 +248,6 @@ export default function Estado() {
     </ScrollView>
   );
 }
-
-
-
 
 
 // despues viene los tylesheet asi que no es necesario que los generes a menos que hagas unos nuevos si es necesario
