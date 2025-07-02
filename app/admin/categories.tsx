@@ -9,6 +9,7 @@ import Icon from 'react-native-vector-icons/FontAwesome';
 import LoadingScreen from '@/components/ui/LoadingScreen'; 
 import Swal from 'sweetalert2';
 import { useSweetAlertWatcher } from '@/hooks/sweetAlertWatcher';
+import { useSubscription } from '@/context/subscriptionContext';
 
 type Categoria = { nombre: string; descripcion: string };
 interface Plato {
@@ -33,6 +34,8 @@ export default function CategoriaScreen() {
     const [showTable, setShowTable] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
+
+    const { limites, puedeCrearCategoria } = useSubscription();
 
     const formOpacity = useRef(new Animated.Value(0)).current;
     const showTableBeforeAlert = useRef(false);
@@ -132,6 +135,16 @@ export default function CategoriaScreen() {
 
     //region Boton crear
     const handleCreate = async () => {
+        const cantidadActual = Object.keys(categorias).length;
+
+        if (!puedeCrearCategoria(cantidadActual)) {
+            Swal.fire({
+                title: 'Límite alcanzado',
+                text: `Tu plan actual solo permite hasta ${limites.categorias} categorías.`,
+                icon: 'warning',
+            });
+            return;
+        }
         setLoading(true);
         try {
             await fetchPlatos(); // solo obtener y setear los platos
