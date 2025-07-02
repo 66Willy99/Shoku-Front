@@ -85,6 +85,7 @@ export default function AdminLayout() {
                     <Stack.Screen name="categories" />
                     <Stack.Screen name="dishes" />
                     <Stack.Screen name="cocina" />
+                    <Stack.Screen name="subscription" />
                 </Stack>
             </View>
         </SubscriptionProvider>

@@ -7,6 +7,8 @@ type Nivel = 0 | 1 | 2;
 interface SubscriptionContextProps {
     nivel: Nivel;
     limites: typeof SubscriptionLimits[Nivel];
+    setNivel: React.Dispatch<React.SetStateAction<Nivel>>;
+    cambiarNivel: (nuevoNivel: number) => void;
     puedeCrearMesa: (cantidadActual: number) => boolean;
     puedeCrearSilla: (actual: number, agregar: number) => boolean;
     puedeCrearPlato: (cantidadActual: number) => boolean;
@@ -29,6 +31,15 @@ const [nivel, setNivel] = useState<Nivel>(1);
 
     const limites = SubscriptionLimits[nivel];
 
+    const cambiarNivel = (nuevoNivel: number) => {
+        if ([0, 1, 2].includes(nuevoNivel)) {
+            setNivel(nuevoNivel as Nivel);
+            AsyncStorage.setItem('Nivel', String(nuevoNivel));
+        } else {
+            console.warn('Nivel inválido:', nuevoNivel);
+        }
+    };
+
     const puedeCrearMesa = (cantidadActual: number) => cantidadActual < limites.mesas;
     const puedeCrearSilla = (sillasActualesTotales: number, sillasPorAgregar: number) => {
         return sillasActualesTotales + sillasPorAgregar <= limites.sillas;
@@ -40,6 +51,8 @@ const [nivel, setNivel] = useState<Nivel>(1);
         <SubscriptionContext.Provider 
             value={{ nivel, 
                     limites, 
+                    setNivel,
+                    cambiarNivel,
                     puedeCrearPlato, 
                     puedeCrearCategoria,
                     puedeCrearMesa,
