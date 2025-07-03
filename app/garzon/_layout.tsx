@@ -8,7 +8,6 @@ import { Config } from "@/constants/config";
 import { SvgXml } from "react-native-svg";
 import Swal from 'sweetalert2';
 import { useNotifications } from '../../hooks/useNotifications';
-import { diagnosticarNotificaciones } from '../../utils/notificationDiagnostic';
 
 // Manejo global de errores
 const handleError = (error: any, context: string) => {
@@ -589,40 +588,9 @@ export default function GarzonLayout({ children }: { children: React.ReactNode }
                 showConfirmButton: false,
             });
 
-            const resultado = await diagnosticarNotificaciones();
+            
 
-            if (resultado.success) {
-                await Swal.fire({
-                    title: "✅ Diagnóstico exitoso",
-                    html: `
-                        <p><strong>Token:</strong> ${resultado.token?.substring(0, 50) || 'N/A'}...</p>
-                        <p><strong>Dispositivo:</strong> ${resultado.device || 'N/A'}</p>
-                        <p><strong>OS:</strong> ${resultado.os || 'N/A'}</p>
-                        <p><strong>Permisos:</strong> ${resultado.permissions || 'N/A'}</p>
-                        <br>
-                        <p>✅ Las notificaciones están funcionando correctamente</p>
-                    `,
-                    icon: "success",
-                    confirmButtonColor: Colors.primary,
-                });
-            } else {
-                const suggestions = (resultado as any).suggestions || [];
-                const suggestionsHtml = suggestions.length > 0 
-                    ? '<br><strong>Soluciones:</strong><br>' + suggestions.map((s: string) => `• ${s}`).join('<br>')
-                    : '';
-                
-                await Swal.fire({
-                    title: "❌ Error en diagnóstico",
-                    html: `
-                        <p><strong>Error:</strong> ${resultado.error || 'Error desconocido'}</p>
-                        ${suggestionsHtml}
-                        <br>
-                        <p>Revisa la consola para más detalles</p>
-                    `,
-                    icon: "error",
-                    confirmButtonColor: Colors.primary,
-                });
-            }
+            
         } catch (error) {
             console.error("Error en diagnóstico:", error);
             await Swal.fire({
@@ -720,21 +688,6 @@ export default function GarzonLayout({ children }: { children: React.ReactNode }
                     <Text style={styles.buttonText}>Ver Pedidos</Text>
                 </TouchableOpacity>
                 
-                {/* Botón de prueba de notificaciones */}
-                <TouchableOpacity
-                    style={[styles.button, styles.testButton, { width: screenWidth * 0.8 }]}
-                    onPress={handleTestNotification}
-                >
-                    <Text style={styles.buttonText}>🔔 Probar Notificación</Text>
-                </TouchableOpacity>
-                
-                {/* Botón de diagnóstico */}
-                <TouchableOpacity
-                    style={[styles.button, styles.diagnosticButton, { width: screenWidth * 0.8 }]}
-                    onPress={handleDiagnosticarNotificaciones}
-                >
-                    <Text style={styles.buttonText}>🔍 Diagnosticar</Text>
-                </TouchableOpacity>
                 
                 {/* Mostrar mesas */}
                 {showMesas && (

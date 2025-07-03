@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, Animated, Easing, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, Animated, Easing, ActivityIndicator, Image, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Config } from '@/constants/config';
 import { Colors } from '@/constants/Colors';
@@ -10,6 +10,8 @@ import LoadingScreen from '@/components/ui/LoadingScreen';
 import Swal from 'sweetalert2';
 import { useSweetAlertWatcher } from '@/hooks/sweetAlertWatcher';
 import { useSubscription } from '@/context/subscriptionContext';
+import * as ImagePicker from 'expo-image-picker';
+import { uploadImageToImgBBBase64 } from '@/services/imageUploadService';
 
 
 type Plato = {
@@ -18,6 +20,7 @@ type Plato = {
     precio: number;
     stock: number;
     categoria_id: string;
+    imagenUrl?: string[]; // Hacer opcional para compatibilidad
 };
 
 type PlatoConId = Plato & { id: string};
@@ -29,8 +32,17 @@ export default function PlatosScreen() {
     const [isCreating, setIsCreating] = useState(false);
     const [selectedPlatoId, setSelectedPlatoId] = useState<string | null>(null);
     const [CatId, setCatId] = useState<string | null>(null);
-    const [formValues, setFormValues] = useState<Plato>({ nombre: '', descripcion: '', precio: 0, stock: 0, categoria_id: '' });
+    const [formValues, setFormValues] = useState<Plato>({ 
+        nombre: '', 
+        descripcion: '', 
+        precio: 0, 
+        stock: 0, 
+        categoria_id: '',
+        imagenUrl: ['']
+    });
     const [showPage, setShowPage] = useState(true);
+    const [selectedImage, setSelectedImage] = useState<string | null>(null);
+    const [uploadingImage, setUploadingImage] = useState(false);
     const { puedeCrearPlato, limites } = useSubscription();
 
     const formOpacity = useRef(new Animated.Value(0)).current;
@@ -78,7 +90,15 @@ export default function PlatosScreen() {
         }
         setIsCreating(true);
         setSelectedPlatoId(null);
-        setFormValues({ nombre: '', descripcion: '', precio: 0, stock: 0, categoria_id: '' });
+        setSelectedImage(null);
+        setFormValues({ 
+            nombre: '', 
+            descripcion: '', 
+            precio: 0, 
+            stock: 0, 
+            categoria_id: '',
+            imagenUrl: ['']
+        });
         Animated.timing(formOpacity, {
             toValue: 1,
             duration: 300,
@@ -90,12 +110,14 @@ export default function PlatosScreen() {
     const handleOpenEdit = (plato : PlatoConId) => {
         setIsCreating(false);
         setSelectedPlatoId(plato.id);
+        setSelectedImage(plato.imagenUrl && plato.imagenUrl[0] ? plato.imagenUrl[0] : null);
         setFormValues({
             nombre: plato.nombre,
             descripcion: plato.descripcion,
             precio: plato.precio,
             stock: plato.stock,
-            categoria_id: plato.categoria_id
+            categoria_id: plato.categoria_id,
+            imagenUrl: plato.imagenUrl || ['']
         });
         setCatId(plato.categoria_id);
         Animated.timing(formOpacity, {
@@ -109,12 +131,83 @@ export default function PlatosScreen() {
     const handleCloseForm = () => {
         setSelectedPlatoId(null);
         setIsCreating(false);
+        setSelectedImage(null);
         Animated.timing(formOpacity, {
             toValue: 0,
             duration: 300,
             useNativeDriver: true,
             easing: Easing.inOut(Easing.ease),
         }).start(() => {});
+    };
+
+    // Función para seleccionar imagen
+    const handleSelectImage = async () => {
+        try {
+            // Solicitar permisos
+            const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            
+            if (permissionResult.granted === false) {
+                Alert.alert(
+                    "Permisos requeridos",
+                    "Necesitamos acceso a tu galería para seleccionar imágenes."
+                );
+                return;
+            }
+
+            // Abrir selector de imágenes
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [1, 1], // Aspecto cuadrado para platos
+                quality: 0.8,
+                base64: false,
+            });
+
+            if (!result.canceled && result.assets && result.assets[0]) {
+                const imageUri = result.assets[0].uri;
+                console.log('🖼️ Imagen seleccionada:', imageUri);
+                setSelectedImage(imageUri);
+            }
+        } catch (error) {
+            console.error('❌ Error seleccionando imagen:', error);
+            Alert.alert(
+                "Error",
+                "No se pudo seleccionar la imagen. Inténtalo de nuevo."
+            );
+        }
+    };
+
+    // Función para subir imagen
+    const handleUploadImage = async (imageUri: string): Promise<string | null> => {
+        try {
+            setUploadingImage(true);
+            console.log('📤 Iniciando subida de imagen...');
+            
+            const imageName = `plato_${Date.now()}.jpg`;
+            const result = await uploadImageToImgBBBase64(imageUri, imageName);
+            
+            if (result.success && result.data) {
+                console.log('✅ Imagen subida exitosamente!');
+                console.log('🔗 URL:', result.data.display_url);
+                return result.data.display_url;
+            } else {
+                console.error('❌ Error subiendo imagen:', result.error);
+                Alert.alert(
+                    "Error",
+                    `No se pudo subir la imagen: ${result.error}`
+                );
+                return null;
+            }
+        } catch (error) {
+            console.error('❌ Error en handleUploadImage:', error);
+            Alert.alert(
+                "Error",
+                "Error inesperado al subir la imagen."
+            );
+            return null;
+        } finally {
+            setUploadingImage(false);
+        }
     };
 
     const handleSubmitPlato = async () => {
@@ -125,12 +218,25 @@ export default function PlatosScreen() {
             let platoId = selectedPlatoId;
             let catId = CatId;
 
+            // Subir imagen si se seleccionó una nueva
+            let imagenUrl = formValues.imagenUrl;
+            if (selectedImage) {
+                const uploadedImageUrl = await handleUploadImage(selectedImage);
+                if (uploadedImageUrl) {
+                    imagenUrl = [uploadedImageUrl];
+                } else {
+                    // Si la subida de imagen falla, detener el proceso
+                    setIsSubmitting(false);
+                    return;
+                }
+            }
+
             const createBody = {
                 user_id: userId,
                 restaurante_id: restauranteId,
                 categoria_id: "",
                 descripcion: formValues.descripcion,
-                imagenUrl: [ "" ],
+                imagenUrl: imagenUrl,
                 nombre: formValues.nombre,
                 precio: formValues.precio,
                 stock: formValues.stock
@@ -142,7 +248,7 @@ export default function PlatosScreen() {
                 plato_id: platoId,
                 categoria_id: catId,
                 descripcion: formValues.descripcion,
-                imagenUrl: [ "" ],
+                imagenUrl: imagenUrl,
                 nombre: formValues.nombre,
                 precio: formValues.precio,
                 stock: formValues.stock
@@ -250,9 +356,29 @@ export default function PlatosScreen() {
                     <ScrollView contentContainerStyle={styles.cardsContainer}>
                         {Object.entries(platos).map(([id, plato]) => (
                             <View key={id} style={styles.card}>
-                                <BoldText style={styles.cardTitle}>{plato.nombre}</BoldText>
-                                <Text style={styles.cardDescription}>{plato.descripcion}</Text>
-                                <BoldText style={styles.cardPrice}>${plato.precio.toFixed(0)}</BoldText>
+                                {/* Imagen del plato */}
+                                {plato.imagenUrl && plato.imagenUrl[0] && plato.imagenUrl[0] !== '' ? (
+                                    <Image 
+                                        source={{ uri: plato.imagenUrl[0] }} 
+                                        style={styles.cardImage}
+                                        defaultSource={require('@/assets/images/shoku-logo.png')}
+                                    />
+                                ) : (
+                                    <View style={styles.cardImagePlaceholder}>
+                                        <Icon name="image" size={30} color={Colors.grey} />
+                                        <Text style={styles.noImageText}>Sin imagen</Text>
+                                    </View>
+                                )}
+                                
+                                <View style={styles.cardContent}>
+                                    <BoldText style={styles.cardTitle}>{plato.nombre}</BoldText>
+                                    <Text style={styles.cardDescription} numberOfLines={2}>
+                                        {plato.descripcion}
+                                    </Text>
+                                    <BoldText style={styles.cardPrice}>${plato.precio.toFixed(0)}</BoldText>
+                                    <Text style={styles.cardStock}>Stock: {plato.stock}</Text>
+                                </View>
+                                
                                 <View style={styles.removeButtonContainer}>
                                     <Pressable style={styles.removeButton} onPress={() => handleDelete(id)}>
                                         <Icon name="trash" size={18} color="#fff" />
@@ -316,6 +442,42 @@ export default function PlatosScreen() {
                         keyboardType="numeric"
                     />
 
+                    <BoldText style={styles.camposForm}>Imagen: </BoldText>
+                    <Pressable 
+                        style={[styles.imagePicker, uploadingImage && styles.imagePickerDisabled]} 
+                        onPress={uploadingImage ? undefined : handleSelectImage}
+                        disabled={uploadingImage}
+                    >
+                        {uploadingImage ? (
+                            <View style={styles.uploadingContainer}>
+                                <ActivityIndicator size="large" color={Colors.primary} />
+                                <Text style={styles.uploadingText}>Subiendo imagen...</Text>
+                            </View>
+                        ) : selectedImage ? (
+                            <>
+                                <Image source={{ uri: selectedImage }} style={styles.imagePreview} />
+                                <View style={styles.imageOverlay}>
+                                    <Icon name="camera" size={20} color="#fff" />
+                                    <Text style={styles.changeImageText}>Cambiar</Text>
+                                </View>
+                            </>
+                        ) : (
+                            <View style={styles.imagePlaceholderContainer}>
+                                <Icon name="camera" size={30} color={Colors.primary} />
+                                <Text style={styles.imagePlaceholder}>Seleccionar imagen</Text>
+                            </View>
+                        )}
+                    </Pressable>
+
+                    {selectedImage && !uploadingImage && (
+                        <Pressable 
+                            style={styles.removeImageButton} 
+                            onPress={() => setSelectedImage(null)}
+                        >
+                            <Text style={styles.removeImageText}>Quitar imagen</Text>
+                        </Pressable>
+                    )}
+
                     <View style={styles.formButtons}>
                         <Pressable style={[styles.button, { backgroundColor: 'gray' }]} onPress={handleCloseForm}>
                             <BoldText style={styles.textButton}>Cancelar</BoldText>
@@ -364,29 +526,60 @@ const styles = StyleSheet.create({
         position: 'relative',
         backgroundColor: '#fff',
         borderRadius: 10,
-        padding: 15,
+        padding: 0, // Cambiamos a 0 para manejar el padding internamente
         width: 160,
-        minHeight: 200,
+        minHeight: 240, // Aumentamos la altura para acomodar la imagen
         elevation: 3,
         shadowColor: '#000',
         shadowOpacity: 0.2,
         shadowRadius: 5,
+        overflow: 'hidden', // Para que la imagen respete el borderRadius
+    },
+    cardImage: {
+        width: '100%',
+        height: 100,
+        resizeMode: 'cover',
+    },
+    cardImagePlaceholder: {
+        width: '100%',
+        height: 100,
+        backgroundColor: '#f5f5f5',
+        justifyContent: 'center',
         alignItems: 'center',
+        borderBottomWidth: 1,
+        borderBottomColor: '#eee',
+    },
+    noImageText: {
+        color: Colors.grey,
+        fontSize: 12,
+        marginTop: 5,
+    },
+    cardContent: {
+        padding: 10,
+        flex: 1,
     },
     cardTitle: {
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: 'bold',
-        marginBottom: 10,
+        marginBottom: 5,
         color: Colors.primary,
     },
     cardDescription: {
-        fontSize: 14,
-        textAlign: 'center',
-        marginBottom: 10,
+        fontSize: 12,
+        textAlign: 'left',
+        marginBottom: 8,
+        color: '#666',
+        lineHeight: 16,
     },
     cardPrice: {
         fontSize: 16,
         color: Colors.primary,
+        fontWeight: 'bold',
+    },
+    cardStock: {
+        fontSize: 12,
+        color: Colors.grey,
+        marginTop: 2,
     },
     formContainer: {
         position: 'absolute',
@@ -491,5 +684,73 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    imagePicker: {
+        borderWidth: 1,
+        borderColor: Colors.primary,
+        borderRadius: 8,
+        padding: 10,
+        marginVertical: 5,
+        height: 100,
+        justifyContent: 'center',
+        alignItems: 'center',
+        position: 'relative',
+    },
+    imagePickerDisabled: {
+        backgroundColor: '#f5f5f5',
+        borderColor: '#ccc',
+    },
+    imagePreview: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 8,
+    },
+    imagePlaceholder: {
+        color: Colors.primary,
+        fontSize: 16,
+        textAlign: 'center',
+        marginTop: 5,
+    },
+    imagePlaceholderContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    uploadingContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    uploadingText: {
+        color: Colors.primary,
+        fontSize: 14,
+        marginTop: 10,
+        textAlign: 'center',
+    },
+    imageOverlay: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 5,
+        borderBottomLeftRadius: 8,
+        borderBottomRightRadius: 8,
+    },
+    changeImageText: {
+        color: '#fff',
+        fontSize: 12,
+        marginLeft: 5,
+    },
+    removeImageButton: {
+        alignItems: 'center',
+        marginTop: 5,
+        padding: 5,
+    },
+    removeImageText: {
+        color: 'red',
+        fontSize: 14,
+        textDecorationLine: 'underline',
     },
 });
