@@ -11,6 +11,7 @@ import { MenuProvider } from '../context/MenuContext';
 import { FavoritesProvider } from '../context/FavoritesContext';
 import { OrdersProvider } from '../context/OrdersContext';
 import { CarritoProvider } from '../context/CarritoContext';
+import { QRParamsProvider } from '../context/QRParamsContext';
 import { StatusBar as RNStatusBar } from 'react-native';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { AuthProvider } from '../context/authContext';
@@ -51,29 +52,31 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
-      <MenuProvider>
-        <FavoritesProvider>
-          <OrdersProvider>
-            <CarritoProvider>
-              <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-                  {/* Este maneja los colores principales de la barra*/}
-                  <RNStatusBar 
-                  barStyle="dark-content" 
-                  backgroundColor="transparent" 
-                  />
-                <Stack
-                  screenOptions={{ headerShown: false }}>
-                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                  <Stack.Screen name="+not-found" options={{ title: 'No encontrado' }} />
-                </Stack>
-                <StatusBar style="auto" />
-                {/* Monta Toast solo en cliente móvil */}
-                {mounted && ToastComponent && <ToastComponent />}
-              </ThemeProvider>
-            </CarritoProvider>
-          </OrdersProvider>
-        </FavoritesProvider>
-      </MenuProvider>
+      <QRParamsProvider>
+        <MenuProvider>
+          <FavoritesProvider>
+            <OrdersProvider>
+              <CarritoProvider>
+                <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+                    {/* Este maneja los colores principales de la barra*/}
+                    <RNStatusBar 
+                    barStyle="dark-content" 
+                    backgroundColor="transparent" 
+                    />
+                  <Stack
+                    screenOptions={{ headerShown: false }}>
+                    <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                    <Stack.Screen name="+not-found" options={{ title: 'No encontrado' }} />
+                  </Stack>
+                  <StatusBar style="auto" />
+                  {/* Monta Toast solo en cliente móvil */}
+                  {mounted && ToastComponent && <ToastComponent />}
+                </ThemeProvider>
+              </CarritoProvider>
+            </OrdersProvider>
+          </FavoritesProvider>
+        </MenuProvider>
+      </QRParamsProvider>
     </AuthProvider>
   );
 }

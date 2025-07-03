@@ -6,6 +6,18 @@ import Icon from '../../components/ui/Icon';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Config } from "@/constants/config";
 import { SvgXml } from "react-native-svg";
+import Swal from 'sweetalert2';
+import { useNotifications } from '../../hooks/useNotifications';
+import { diagnosticarNotificaciones } from '../../utils/notificationDiagnostic';
+
+// Manejo global de errores
+const handleError = (error: any, context: string) => {
+    console.error(`Error en ${context}:`, error);
+    // Evitar mostrar alertas si es un error de conexión común
+    if (error?.name !== 'AbortError' && error?.code !== 'NETWORK_ERROR') {
+        console.warn(`Error no crítico en ${context}:`, error.message || error);
+    }
+};
 
 const mesaDisponibleSVG = `
 <svg fill="#000000" height="60px" width="60px" version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="-153.3 -153.3 817.60 817.60" xml:space="preserve" transform="matrix(-1, 0, 0, 1, 0, 0)rotate(0)">
@@ -56,51 +68,114 @@ export default function GarzonLayout({ children }: { children: React.ReactNode }
     const router = useRouter();
     const screenWidth = Dimensions.get("window").width;
     const [showMesas, setShowMesas] = useState(false);
+    const [showPedidos, setShowPedidos] = useState(false);
     const [mesas, setMesas] = useState<Mesa[]>([]);
+    const [pedidosTerminados, setPedidosTerminados] = useState<any[]>([]);
     const [loadingMesas, setLoadingMesas] = useState(false);
+    const [loadingPedidos, setLoadingPedidos] = useState(false);
     const ws = useRef<WebSocket | null>(null);
+    const reconnectTimeout = useRef<NodeJS.Timeout | null>(null);
+    
+    // Hook para notificaciones push
+    const { showLocalNotification, registerGarzonToken, testNotification } = useNotifications();
 
-    // Validación de rol
+    // Validación de rol y registro de token de notificaciones
     useEffect(() => {
-        const trabajadorStr = localStorage.getItem("trabajador");
-        if (!trabajadorStr) {
-            router.replace("/");
-            return;
-        }
-        try {
-            const trabajador = JSON.parse(trabajadorStr);
-            if (trabajador.rol !== "garzon") {
-                router.replace("/");
+        let isMounted = true;
+        
+        const checkRoleAndRegisterToken = async () => {
+            try {
+                const trabajadorStr = await AsyncStorage.getItem("trabajador");
+                if (!trabajadorStr && isMounted) {
+                    router.replace("/");
+                    return;
+                }
+                if (!isMounted || !trabajadorStr) return;
+                
+                const trabajador = JSON.parse(trabajadorStr);
+                if (trabajador.rol !== "garzon" && isMounted) {
+                    router.replace("/");
+                    return;
+                }
+
+                // Registrar token de notificaciones para garzón
+                if (isMounted) {
+                    const tokenRegistered = await AsyncStorage.getItem('garzonTokenRegistered');
+                    
+                    if (!tokenRegistered) {
+                        console.log('🔔 Registrando token de notificaciones para garzón...');
+                        
+                        const success = await registerGarzonToken(
+                            trabajador.user_id,
+                            trabajador.restaurante_id,
+                            trabajador.id || trabajador.trabajador_id
+                        );
+
+                        if (success) {
+                            console.log('✅ Token de garzón registrado exitosamente');
+                        } else {
+                            console.log('❌ No se pudo registrar el token de garzón');
+                        }
+                    } else {
+                        console.log('✅ Token de garzón ya está registrado');
+                    }
+                }
+            } catch (error) {
+                console.error("Error checking role and registering token:", error);
+                if (isMounted) {
+                    router.replace("/");
+                }
             }
-        } catch {
-            router.replace("/");
-        }
-    }, [router]);
+        };
+        
+        checkRoleAndRegisterToken();
+        
+        return () => {
+            isMounted = false;
+        };
+    }, [router, registerGarzonToken]);
 
-    // WebSocket para actualización de mesas en tiempo real
+    // WebSocket para actualización de mesas y pedidos en tiempo real
     useEffect(() => {
+        let isMounted = true;
+        
         const connectWebSocket = async () => {
             try {
                 const trabajadorStr = await AsyncStorage.getItem("trabajador");
-                if (!trabajadorStr) return;
+                if (!trabajadorStr || !isMounted) return;
+                
                 const trabajador = JSON.parse(trabajadorStr);
                 const user_id = trabajador.user_id;
                 const restaurante_id = trabajador.restaurante_id;
-                if (!user_id || !restaurante_id) return;
+                if (!user_id || !restaurante_id || !isMounted) return;
+
+                // Cerrar conexión anterior si existe
+                if (ws.current) {
+                    ws.current.close();
+                    ws.current = null;
+                }
 
                 ws.current = new WebSocket(`${Config.API_URL_WS}/ws/kitchen/${user_id}/${restaurante_id}`);
 
                 ws.current.onopen = () => {
+                    if (!isMounted) return;
                     console.log("WebSocket conectado (garzón)");
+                    // Limpiar timeout de reconexión si existe
+                    if (reconnectTimeout.current) {
+                        clearTimeout(reconnectTimeout.current);
+                        reconnectTimeout.current = null;
+                    }
                 };
 
                 ws.current.onmessage = async (event) => {
+                    if (!isMounted) return;
                     try {
                         const data = JSON.parse(event.data);
                         console.log("Mensaje WS recibido:", data);
 
                         // Si el evento es actualización de mesa, actualiza el estado de las mesas
                         if (data.evento === "actualizar_mesa" && data.mesa_id && data.estado) {
+                            if (!isMounted) return;
                             setMesas(prevMesas =>
                                 prevMesas.map(m =>
                                     m.id === data.mesa_id
@@ -110,12 +185,147 @@ export default function GarzonLayout({ children }: { children: React.ReactNode }
                             );
                         }
 
-                        // Si el evento es actualización de pedido terminado, puedes mostrar una alerta
-                        if (data.evento === "pedido_actualizado" && data.estado_actual === "terminado") {
-                            Alert.alert(
-                                "Pedido terminado",
-                                `El pedido #${data.pedido_id} está listo para entregar.`
+                        // Si el evento es pedido terminado, agrégalo a la lista de pedidos listos
+                        if (data.evento === "pedido_terminado" || data.evento === "nuevo_pedido_terminado") {
+                            if (!isMounted) return;
+                            // Obtener detalles del pedido terminado directamente
+                            const trabajadorStr = await AsyncStorage.getItem("trabajador");
+                            if (!trabajadorStr || !isMounted) return;
+                            const trabajador = JSON.parse(trabajadorStr);
+                            const user_id = trabajador.user_id;
+                            const restaurante_id = trabajador.restaurante_id;
+
+                            try {
+                                // Obtener detalles del pedido específico
+                                const detalleRes = await fetch(
+                                    `${Config.API_URL}/pedido/detalle?user_id=${user_id}&restaurante_id=${restaurante_id}&pedido_id=${data.pedido_id}`
+                                );
+                                const detalleData = await detalleRes.json();
+                                const detalle = detalleData.pedido_detalle;
+                                
+                                if (detalle && detalle.estado_actual === "terminado") {
+                                    if (!isMounted) return;
+                                    const nuevoPedido = {
+                                        pedido_id: data.pedido_id,
+                                        mesa_numero: detalle.mesa,
+                                        platos: Object.entries(detalle.platos).map(([nombre, cantidad]) => ({
+                                            nombre,
+                                            cantidad: Number(cantidad),
+                                        })),
+                                        estado_actual: detalle.estado_actual,
+                                        detalle: detalle.detalle || 'Sin detalle',
+                                        hora_pedido: new Date().toLocaleTimeString() // Hora actual cuando llega
+                                    };
+
+                                    // Agregar el nuevo pedido a la lista (solo si no existe ya)
+                                    setPedidosTerminados(prevPedidos => {
+                                        const existePedido = prevPedidos.some(p => p.pedido_id === data.pedido_id);
+                                        if (!existePedido) {
+                                            return [nuevoPedido, ...prevPedidos];
+                                        }
+                                        return prevPedidos;
+                                    });
+
+                                    // Mostrar notificación al garzón solo si el componente está montado
+                                    if (isMounted) {
+                                        // Mostrar notificación push nativa (funciona con pantalla bloqueada)
+                                        await showLocalNotification(
+                                            "¡Pedido listo!",
+                                            `Pedido #${data.pedido_id} de la mesa ${detalle.mesa} terminado`,
+                                            { pedido_id: data.pedido_id, mesa: detalle.mesa }
+                                        );
+                                        
+                                        // Usar setTimeout para evitar problemas de concurrencia
+                                        setTimeout(async () => {
+                                            if (isMounted) {
+                                                try {
+                                                    await Swal.fire({
+                                                        title: "¡Pedido listo!",
+                                                        text: `El pedido #${data.pedido_id} de la mesa ${detalle.mesa} está terminado y listo para entregar.`,
+                                                        icon: "info",
+                                                        timer: 3000,
+                                                        showConfirmButton: true,
+                                                        confirmButtonText: "Entendido",
+                                                        confirmButtonColor: Colors.secondary,
+                                                    });
+                                                } catch (alertError) {
+                                                    console.log("Error mostrando alerta:", alertError);
+                                                }
+                                            }
+                                        }, 100);
+                                    }
+                                }
+                            } catch (error) {
+                                console.error("Error al obtener detalles del pedido terminado:", error);
+                            }
+                        }
+
+                        // Si el evento es pedido entregado, removerlo de la lista
+                        if (data.evento === "pedido_actualizado" && data.estado_actual === "entregado") {
+                            if (!isMounted) return;
+                            setPedidosTerminados(prevPedidos => 
+                                prevPedidos.filter(p => p.pedido_id !== data.pedido_id)
                             );
+                        }
+
+                        // Si el evento es actualización de estado de pedido
+                        if (data.evento === "pedido_actualizado") {
+                            // Si el pedido cambió a terminado, agregarlo
+                            if (data.estado_actual === "terminado") {
+                                const trabajadorStr = await AsyncStorage.getItem("trabajador");
+                                if (!trabajadorStr) return;
+                                const trabajador = JSON.parse(trabajadorStr);
+                                const user_id = trabajador.user_id;
+                                const restaurante_id = trabajador.restaurante_id;
+
+                                try {
+                                    const detalleRes = await fetch(
+                                        `${Config.API_URL}/pedido/detalle?user_id=${user_id}&restaurante_id=${restaurante_id}&pedido_id=${data.pedido_id}`
+                                    );
+                                    const detalleData = await detalleRes.json();
+                                    const detalle = detalleData.pedido_detalle;
+                                    
+                                    if (detalle) {
+                                        const nuevoPedido = {
+                                            pedido_id: data.pedido_id,
+                                            mesa_numero: detalle.mesa,
+                                            platos: Object.entries(detalle.platos).map(([nombre, cantidad]) => ({
+                                                nombre,
+                                                cantidad: Number(cantidad),
+                                            })),
+                                            estado_actual: detalle.estado_actual,
+                                            detalle: detalle.detalle || 'Sin detalle',
+                                            hora_pedido: new Date().toLocaleTimeString()
+                                        };
+
+                                        setPedidosTerminados(prevPedidos => {
+                                            const existePedido = prevPedidos.some(p => p.pedido_id === data.pedido_id);
+                                            if (!existePedido) {
+                                                return [nuevoPedido, ...prevPedidos];
+                                            }
+                                            return prevPedidos;
+                                        });
+
+                                        await Swal.fire({
+                                            title: "¡Pedido listo!",
+                                            text: `El pedido #${data.pedido_id} de la mesa ${detalle.mesa} está terminado y listo para entregar.`,
+                                            icon: "info",
+                                            timer: 3000,
+                                            showConfirmButton: true,
+                                            confirmButtonText: "Entendido",
+                                            confirmButtonColor: Colors.secondary,
+                                        });
+                                    }
+                                } catch (error) {
+                                    console.error("Error al obtener detalles del pedido actualizado:", error);
+                                }
+                            }
+                            // Si el pedido cambió a entregado, removerlo
+                            else if (data.estado_actual === "entregado") {
+                                setPedidosTerminados(prevPedidos => 
+                                    prevPedidos.filter(p => p.pedido_id !== data.pedido_id)
+                                );
+                            }
                         }
                     } catch (err) {
                         console.log("Error procesando mensaje WS:", err);
@@ -123,33 +333,58 @@ export default function GarzonLayout({ children }: { children: React.ReactNode }
                 };
 
                 ws.current.onerror = (error) => {
+                    if (!isMounted) return;
                     console.log("WebSocket error:", error);
                 };
 
                 ws.current.onclose = () => {
-                    console.log("WebSocket cerrado");
+                    if (!isMounted) return;
+                    console.log("WebSocket cerrado - intentando reconectar en 5 segundos...");
+                    // Intentar reconectar después de 5 segundos
+                    reconnectTimeout.current = setTimeout(() => {
+                        if (isMounted) {
+                            connectWebSocket();
+                        }
+                    }, 5000);
                 };
             } catch (e) {
+                if (!isMounted) return;
                 console.log("Error al conectar WebSocket:", e);
+                // Intentar reconectar después de 5 segundos en caso de error
+                reconnectTimeout.current = setTimeout(() => {
+                    if (isMounted) {
+                        connectWebSocket();
+                    }
+                }, 5000);
             }
         };
 
         connectWebSocket();
 
         return () => {
+            isMounted = false;
+            if (reconnectTimeout.current) {
+                clearTimeout(reconnectTimeout.current);
+                reconnectTimeout.current = null;
+            }
             if (ws.current) {
                 ws.current.close();
+                ws.current = null;
             }
         };
     }, []);
 
     const handleMostrarMesas = async () => {
-        setShowMesas(!showMesas);
-        if (!showMesas) {
-            setLoadingMesas(true);
-            try {
+        try {
+            setShowMesas(!showMesas);
+            // Cerrar pedidos si está abierto
+            if (showPedidos) setShowPedidos(false);
+            
+            if (!showMesas) {
+                setLoadingMesas(true);
                 const trabajadorStr = await AsyncStorage.getItem("trabajador");
                 if (!trabajadorStr) return;
+                
                 const trabajador = JSON.parse(trabajadorStr);
                 const user_id = trabajador.user_id;
                 const restaurante_id = trabajador.restaurante_id;
@@ -158,6 +393,11 @@ export default function GarzonLayout({ children }: { children: React.ReactNode }
                 const response = await fetch(
                     `${Config.API_URL}/mesa/all?user_id=${user_id}&restaurante_id=${restaurante_id}`
                 );
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
                 const data = await response.json();
                 // Adaptar la respuesta al array de mesas
                 const mesasArray: Mesa[] = data.mesas
@@ -171,11 +411,226 @@ export default function GarzonLayout({ children }: { children: React.ReactNode }
                     }))
                     : [];
                 setMesas(mesasArray);
-            } catch (e) {
-                setMesas([]);
-            } finally {
-                setLoadingMesas(false);
             }
+        } catch (error) {
+            handleError(error, 'cargar mesas');
+            setMesas([]);
+        } finally {
+            setLoadingMesas(false);
+        }
+    };
+
+    const handleMostrarPedidos = async () => {
+        setShowPedidos(!showPedidos);
+        // Cerrar mesas si está abierto
+        if (showMesas) setShowMesas(false);
+        
+        if (!showPedidos) {
+            setLoadingPedidos(true);
+            try {
+                const trabajadorStr = await AsyncStorage.getItem("trabajador");
+                if (!trabajadorStr) return;
+                const trabajador = JSON.parse(trabajadorStr);
+                const user_id = trabajador.user_id;
+                const restaurante_id = trabajador.restaurante_id;
+                if (!user_id || !restaurante_id) return;
+
+                // 1. Obtener todos los pedidos
+                const response = await fetch(
+                    `${Config.API_URL}/pedidos/?user_id=${user_id}&restaurante_id=${restaurante_id}`
+                );
+                const data = await response.json();
+                
+                // 2. Filtrar y formatear pedidos terminados directamente
+                const pedidosTerminadosArray = Object.entries(data.pedidos)
+                    .filter(([_, pedido]: [string, any]) => pedido.estados?.estado_actual === "terminado")
+                    .map(([pedido_id, pedido]: [string, any]) => {
+                        // Obtener información de la mesa (necesitarías hacer un fetch adicional para obtener el número)
+                        // Por ahora usamos el mesa_id, pero podrías optimizar esto también
+                        return {
+                            pedido_id,
+                            mesa_numero: pedido.mesa_id, // Aquí podrías mapear el ID a número si tienes esa info
+                            platos: Object.entries(pedido.platos).map(([plato_id, platoInfo]: [string, any]) => ({
+                                nombre: plato_id, // Aquí también podrías mapear el ID al nombre real del plato
+                                cantidad: platoInfo.cantidad,
+                            })),
+                            estado_actual: pedido.estados.estado_actual,
+                            detalle: pedido.detalle || 'Sin detalle',
+                            hora_pedido: pedido.estados.terminado ? 
+                                new Date(pedido.estados.terminado).toLocaleTimeString() : 
+                                'No especificada'
+                        };
+                    });
+
+                setPedidosTerminados(pedidosTerminadosArray);
+                
+            } catch (e) {
+                console.error("Error al cargar pedidos terminados:", e);
+                setPedidosTerminados([]);
+            } finally {
+                setLoadingPedidos(false);
+            }
+        }
+    };
+
+    const handleEntregarPedido = async (pedido_id: string) => {
+        const result = await Swal.fire({
+            title: "Confirmar entrega",
+            text: "¿Confirmas que el pedido ha sido entregado al cliente?",
+            icon: "question",
+            showCancelButton: true,
+            confirmButtonText: "Sí, entregado",
+            cancelButtonText: "Cancelar",
+            confirmButtonColor: Colors.secondary,
+            cancelButtonColor: Colors.grey,
+        });
+
+        if (!result.isConfirmed) return;
+
+        try {
+            const trabajadorStr = await AsyncStorage.getItem("trabajador");
+            if (!trabajadorStr) return;
+            const trabajador = JSON.parse(trabajadorStr);
+            const user_id = trabajador.user_id;
+            const restaurante_id = trabajador.restaurante_id;
+
+            const response = await fetch(
+                `${Config.API_URL}/pedido`,
+                {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        pedido_id,
+                        user_id,
+                        restaurante_id,
+                        estado_actual: 3 // Estado entregado
+                    })
+                }
+            );
+            
+            if (response.ok) {
+                // Eliminar el pedido de la lista
+                setPedidosTerminados(prev => 
+                    prev.filter(p => p.pedido_id !== pedido_id)
+                );
+                await Swal.fire({
+                    title: "¡Éxito!",
+                    text: "Pedido marcado como entregado",
+                    icon: "success",
+                    timer: 2000,
+                    showConfirmButton: false,
+                });
+            } else {
+                await Swal.fire({
+                    title: "Error",
+                    text: "No se pudo actualizar el estado del pedido",
+                    icon: "error",
+                    confirmButtonColor: Colors.primary,
+                });
+            }
+        } catch (e) {
+            await Swal.fire({
+                title: "Error de conexión",
+                text: "No se pudo conectar al servidor",
+                icon: "error",
+                confirmButtonColor: Colors.primary,
+            });
+        }
+    };
+
+    // Función para probar notificaciones
+    const handleTestNotification = async () => {
+        try {
+            const trabajadorStr = await AsyncStorage.getItem("trabajador");
+            if (!trabajadorStr) return;
+            
+            const trabajador = JSON.parse(trabajadorStr);
+            
+            const result = await testNotification(
+                trabajador.user_id,
+                trabajador.restaurante_id
+            );
+
+            if (result) {
+                await Swal.fire({
+                    title: "🔔 Notificación enviada",
+                    text: "Se ha enviado una notificación de prueba a todos los garzones",
+                    icon: "success",
+                    timer: 3000,
+                    showConfirmButton: false,
+                });
+            } else {
+                await Swal.fire({
+                    title: "❌ Error",
+                    text: "No se pudo enviar la notificación de prueba",
+                    icon: "error",
+                    confirmButtonColor: Colors.primary,
+                });
+            }
+        } catch (error) {
+            console.error("Error en prueba de notificación:", error);
+            await Swal.fire({
+                title: "❌ Error",
+                text: "Error enviando notificación de prueba",
+                icon: "error",
+                confirmButtonColor: Colors.primary,
+            });
+        }
+    };
+
+    // Función para diagnosticar notificaciones
+    const handleDiagnosticarNotificaciones = async () => {
+        try {
+            await Swal.fire({
+                title: "🔍 Ejecutando diagnóstico...",
+                text: "Verificando configuración de notificaciones",
+                icon: "info",
+                timer: 2000,
+                showConfirmButton: false,
+            });
+
+            const resultado = await diagnosticarNotificaciones();
+
+            if (resultado.success) {
+                await Swal.fire({
+                    title: "✅ Diagnóstico exitoso",
+                    html: `
+                        <p><strong>Token:</strong> ${resultado.token?.substring(0, 50) || 'N/A'}...</p>
+                        <p><strong>Dispositivo:</strong> ${resultado.device || 'N/A'}</p>
+                        <p><strong>OS:</strong> ${resultado.os || 'N/A'}</p>
+                        <p><strong>Permisos:</strong> ${resultado.permissions || 'N/A'}</p>
+                        <br>
+                        <p>✅ Las notificaciones están funcionando correctamente</p>
+                    `,
+                    icon: "success",
+                    confirmButtonColor: Colors.primary,
+                });
+            } else {
+                const suggestions = (resultado as any).suggestions || [];
+                const suggestionsHtml = suggestions.length > 0 
+                    ? '<br><strong>Soluciones:</strong><br>' + suggestions.map((s: string) => `• ${s}`).join('<br>')
+                    : '';
+                
+                await Swal.fire({
+                    title: "❌ Error en diagnóstico",
+                    html: `
+                        <p><strong>Error:</strong> ${resultado.error || 'Error desconocido'}</p>
+                        ${suggestionsHtml}
+                        <br>
+                        <p>Revisa la consola para más detalles</p>
+                    `,
+                    icon: "error",
+                    confirmButtonColor: Colors.primary,
+                });
+            }
+        } catch (error) {
+            console.error("Error en diagnóstico:", error);
+            await Swal.fire({
+                title: "❌ Error",
+                text: "Error ejecutando diagnóstico de notificaciones",
+                icon: "error",
+                confirmButtonColor: Colors.primary,
+            });
         }
     };
 
@@ -192,6 +647,56 @@ export default function GarzonLayout({ children }: { children: React.ReactNode }
         if (estado === "pagado") return <SvgXml xml={mesaPagadaSVG} width={60} height={60} />;
         return <Icon color={Colors.primary} size={60} />;
     };
+
+    // Función para refrescar pedidos terminados
+    const refreshPedidosTerminados = async () => {
+        try {
+            const trabajadorStr = await AsyncStorage.getItem("trabajador");
+            if (!trabajadorStr) return;
+            const trabajador = JSON.parse(trabajadorStr);
+            const user_id = trabajador.user_id;
+            const restaurante_id = trabajador.restaurante_id;
+            if (!user_id || !restaurante_id) return;
+
+            const response = await fetch(
+                `${Config.API_URL}/pedidos/?user_id=${user_id}&restaurante_id=${restaurante_id}`
+            );
+            const data = await response.json();
+            
+            const pedidosTerminadosArray = Object.entries(data.pedidos)
+                .filter(([_, pedido]: [string, any]) => pedido.estados?.estado_actual === "terminado")
+                .map(([pedido_id, pedido]: [string, any]) => ({
+                    pedido_id,
+                    mesa_numero: pedido.mesa_id,
+                    platos: Object.entries(pedido.platos).map(([plato_id, platoInfo]: [string, any]) => ({
+                        nombre: plato_id,
+                        cantidad: platoInfo.cantidad,
+                    })),
+                    estado_actual: pedido.estados.estado_actual,
+                    detalle: pedido.detalle || 'Sin detalle',
+                    hora_pedido: pedido.estados.terminado ? 
+                        new Date(pedido.estados.terminado).toLocaleTimeString() : 
+                        'No especificada'
+                }));
+
+            setPedidosTerminados(pedidosTerminadosArray);
+        } catch (e) {
+            console.error("Error al refrescar pedidos terminados:", e);
+        }
+    };
+
+    // Auto-refresh cada 30 segundos cuando se muestran los pedidos
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+        if (showPedidos) {
+            interval = setInterval(() => {
+                refreshPedidosTerminados();
+            }, 30000); // Refrescar cada 30 segundos
+        }
+        return () => {
+            if (interval) clearInterval(interval);
+        };
+    }, [showPedidos]);
 
     return (
         <View style={styles.container}>
@@ -210,10 +715,27 @@ export default function GarzonLayout({ children }: { children: React.ReactNode }
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={[styles.button, { width: screenWidth * 0.8 }]}
-                    onPress={() => router.push("/garzon/pedidos")}
+                    onPress={handleMostrarPedidos}
                 >
                     <Text style={styles.buttonText}>Ver Pedidos</Text>
                 </TouchableOpacity>
+                
+                {/* Botón de prueba de notificaciones */}
+                <TouchableOpacity
+                    style={[styles.button, styles.testButton, { width: screenWidth * 0.8 }]}
+                    onPress={handleTestNotification}
+                >
+                    <Text style={styles.buttonText}>🔔 Probar Notificación</Text>
+                </TouchableOpacity>
+                
+                {/* Botón de diagnóstico */}
+                <TouchableOpacity
+                    style={[styles.button, styles.diagnosticButton, { width: screenWidth * 0.8 }]}
+                    onPress={handleDiagnosticarNotificaciones}
+                >
+                    <Text style={styles.buttonText}>🔍 Diagnosticar</Text>
+                </TouchableOpacity>
+                
                 {/* Mostrar mesas */}
                 {showMesas && (
                     <View style={{ width: "100%", marginTop: 16 }}>
@@ -237,6 +759,40 @@ export default function GarzonLayout({ children }: { children: React.ReactNode }
                                         <Text style={styles.mesaText}>Capacidad: {mesa.capacidad}</Text>
                                     </View>
                                 </TouchableOpacity>
+                            ))
+                        )}
+                    </View>
+                )}
+
+                {/* Mostrar pedidos terminados */}
+                {showPedidos && (
+                    <View style={{ width: "100%", marginTop: 16 }}>
+                        {loadingPedidos ? (
+                            <Text style={{ textAlign: "center", color: Colors.primary }}>Cargando pedidos...</Text>
+                        ) : pedidosTerminados.length === 0 ? (
+                            <Text style={{ textAlign: "center", color: Colors.primary }}>No hay pedidos listos para entregar.</Text>
+                        ) : (
+                            pedidosTerminados.map((pedido) => (
+                                <View key={pedido.pedido_id} style={styles.pedidoCard}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.pedidoTitle}>Pedido #{pedido.pedido_id}</Text>
+                                        <Text style={styles.pedidoText}>Mesa: {pedido.mesa_numero}</Text>
+                                        <Text style={styles.pedidoText}>Detalle: {pedido.detalle}</Text>
+                                        <Text style={styles.pedidoSubtitle}>Platos:</Text>
+                                        {pedido.platos.map((plato: any, idx: number) => (
+                                            <Text key={idx} style={styles.platoText}>
+                                                • {plato.nombre} x {plato.cantidad}
+                                            </Text>
+                                        ))}
+                                        <Text style={styles.pedidoText}>Hora: {pedido.hora_pedido}</Text>
+                                    </View>
+                                    <TouchableOpacity
+                                        style={styles.entregarButton}
+                                        onPress={() => handleEntregarPedido(pedido.pedido_id)}
+                                    >
+                                        <Text style={styles.entregarButtonText}>Entregar</Text>
+                                    </TouchableOpacity>
+                                </View>
                             ))
                         )}
                     </View>
@@ -285,6 +841,12 @@ const styles = StyleSheet.create({
         marginBottom: 20,
         elevation: 2,
     },
+    testButton: {
+        backgroundColor: Colors.secondary,
+    },
+    diagnosticButton: {
+        backgroundColor: Colors.yellow,
+    },
     buttonText: {
         color: "#fff",
         fontWeight: "bold",
@@ -310,5 +872,54 @@ const styles = StyleSheet.create({
         fontSize: 15,
         color: Colors.primary,
         marginBottom: 1,
+    },
+    pedidoCard: {
+        flexDirection: "row",
+        backgroundColor: "#fff",
+        borderRadius: 12,
+        marginHorizontal: 16,
+        marginBottom: 12,
+        padding: 16,
+        alignItems: "flex-start",
+        elevation: 2,
+        borderLeftWidth: 4,
+        borderLeftColor: Colors.secondary,
+    },
+    pedidoTitle: {
+        fontSize: 18,
+        fontWeight: "bold",
+        color: Colors.primary,
+        marginBottom: 6,
+    },
+    pedidoText: {
+        fontSize: 14,
+        color: Colors.primary,
+        marginBottom: 4,
+    },
+    pedidoSubtitle: {
+        fontSize: 15,
+        fontWeight: "600",
+        color: Colors.primary,
+        marginTop: 6,
+        marginBottom: 4,
+    },
+    platoText: {
+        fontSize: 13,
+        color: Colors.grey,
+        marginLeft: 8,
+        marginBottom: 2,
+    },
+    entregarButton: {
+        backgroundColor: Colors.secondary,
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        borderRadius: 8,
+        marginLeft: 12,
+        alignSelf: "center",
+    },
+    entregarButtonText: {
+        color: "#fff",
+        fontWeight: "bold",
+        fontSize: 14,
     },
 });

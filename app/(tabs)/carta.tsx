@@ -6,9 +6,10 @@ import {
 import { useMenu } from '../../context/MenuContext';
 import { useFavorites } from '../../context/FavoritesContext';
 import { useCarrito } from '../../context/CarritoContext';
+import { useQRParams } from '../../context/QRParamsContext';
 import { dishImages } from '../../assets/images';
 import { COLORS, FONT_SIZES, SPACING } from '../../theme';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter } from 'expo-router';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const H_PAD = SPACING.md;
@@ -28,8 +29,13 @@ export default function Carta() {
   const { carrito } = useCarrito();
   const router = useRouter();
 
-  // ✅ Parámetros completos
-  const { userId, restauranteId, mesaId, sillaId } = useLocalSearchParams();
+  // ✅ Parámetros completos del contexto QR
+  const { qrParams, hasValidParams } = useQRParams();
+  
+  const userId = qrParams?.userId || '';
+  const restauranteId = qrParams?.restauranteId || '';
+  const mesaId = qrParams?.mesaId || '';
+  const sillaId = qrParams?.sillaId || '';
 
   const recommended = allDishes.slice(0, 6);
   const carouselRef = useRef<ScrollView>(null);

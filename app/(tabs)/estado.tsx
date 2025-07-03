@@ -5,6 +5,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Order } from '../../context/OrdersContext';
+import { useQRParams } from '../../context/QRParamsContext';
 
 import { COLORS, SPACING, FONT_SIZES } from '../../theme';
 import { Config } from '@/constants/config';
@@ -29,21 +30,21 @@ const STATUS_INDEX: Record<string, number> = {
 };
 
 export default function Estado() {
-  const {
-    mesa_id,
-    silla_id,
-    user_id,
-    restaurante_id,
-    token_ws,
-    approved,
-  } = useLocalSearchParams<{
-    mesa_id?: string;
-    silla_id?: string;
+  // Solo usar useLocalSearchParams para parámetros específicos de pago
+  const params = useLocalSearchParams<{
     token_ws?: string;
     approved?: 'true' | 'false';
-    user_id?: string;
-    restaurante_id?: string;
   }>();
+  
+  const { qrParams, hasValidParams } = useQRParams();
+
+  // Usar parámetros del contexto QR para identificación de mesa/usuario
+  const mesa_id = qrParams?.mesaId || '';
+  const silla_id = qrParams?.sillaId || '';
+  const user_id = qrParams?.userId || '';
+  const restaurante_id = qrParams?.restauranteId || '';
+  const token_ws = params.token_ws;
+  const approved = params.approved;
 
   const router = useRouter();
   const { platos } = useMenu();
@@ -104,13 +105,23 @@ export default function Estado() {
     return () => clearInterval(interval);
   }, [user_id, restaurante_id]);
 
-  const activos = orders.filter(o =>
-    !['entregado', 'completado'].includes(o.status || '')
-  );
+  // Pedidos listos para pagar (entregados pero no pagados)
+  const listosPagar = orders.filter(o => {
+    const estado = o.status || o.estado_actual || '';
+    return estado === 'entregado' && !o.paid;
+  });
 
-  const completados = orders.filter(o =>
-    ['entregado', 'completado'].includes(o.status || '')
-  );
+  // Pedidos en proceso (confirmados, en progreso, listos)
+  const enProceso = orders.filter(o => {
+    const estado = o.status || o.estado_actual || '';
+    return ['confirmado', 'en progreso', 'listo'].includes(estado);
+  });
+
+  // Pedidos completados (pagados)
+  const completados = orders.filter(o => {
+    const estado = o.status || o.estado_actual || '';
+    return o.paid || estado === 'completado';
+  });
 
   const formatTime = (ms: number) =>
     new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -126,32 +137,111 @@ export default function Estado() {
 
   return (
     <ScrollView contentContainerStyle={{ padding: SPACING.md }}>
-      {activos.length > 0 && (
+      {/* Pedidos listos para pagar (entregados) */}
+      {listosPagar.length > 0 && (
         <View>
-          <Text style={{ marginBottom: SPACING.sm, fontWeight: 'bold' }}>
-            ⌛ Pedido en curso, sigue su estado aquí
+          <Text style={{ 
+            marginBottom: SPACING.sm, 
+            fontWeight: 'bold', 
+            color: COLORS.primary,
+            fontSize: FONT_SIZES.subtitle 
+          }}>
+            💳 Pedidos listos para pagar (entregados)
           </Text>
-          {activos.map(o => {
-            const idx = o.status && o.status in STATUS_INDEX ? STATUS_INDEX[o.status] : 0;
+          
+          {listosPagar.map((o, orderIndex) => {
             const platosArray = mapPlatos(o.platos);
             const total = platosArray.reduce((s, i) => s + i.dish.price * i.quantity, 0);
-            const stepsToShow = o.paid ? STEPS : STEPS.slice(1);
+            const orderId = (o as any).id || `temp-${orderIndex}`;
 
             return (
-              <View key={o.id} style={{
+              <View key={orderId} style={{
+                marginBottom: SPACING.md,
+                padding: SPACING.md,
+                borderWidth: 2,
+                borderColor: '#4CAF50',
+                backgroundColor: '#F1F8E9',
+                borderRadius: 10
+              }}>
+                <Text style={{ fontWeight: 'bold', marginBottom: SPACING.sm, color: '#4CAF50' }}>
+                  📦 Orden #{orderId} - LISTO PARA PAGAR
+                </Text>
+                <Text style={{ color: '#333' }}>💵 Total: ${total.toLocaleString()}</Text>
+
+                {platosArray.map((i, index) => (
+                  <Text key={index} style={{ color: '#666' }}>🍽 {i.dish.name} ×{i.quantity}</Text>
+                ))}
+
+                {o.detalle && (
+                  <Text style={{ fontStyle: 'italic', color: '#888', marginTop: SPACING.xs }}>
+                    📝 {o.detalle}
+                  </Text>
+                )}
+              </View>
+            );
+          })}
+
+          {/* Botón para pagar todos los pedidos entregados */}
+          <TouchableOpacity
+            style={{
+              backgroundColor: COLORS.primary,
+              padding: SPACING.md,
+              borderRadius: 10,
+              alignItems: 'center',
+              marginBottom: SPACING.lg,
+            }}
+            onPress={() => {
+              router.push({
+                pathname: '/pago',
+                params: {
+                  mesaId: mesa_id ?? '',
+                  sillaId: silla_id ?? '',
+                  userId: user_id ?? '',
+                  restauranteId: restaurante_id ?? '',
+                },
+              });
+            }}
+          >
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: FONT_SIZES.body }}>
+              💳 Pagar pedidos entregados ({listosPagar.length})
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Pedidos en proceso */}
+      {enProceso.length > 0 && (
+        <View>
+          <Text style={{ 
+            marginBottom: SPACING.sm, 
+            fontWeight: 'bold',
+            color: COLORS.primary,
+            fontSize: FONT_SIZES.subtitle 
+          }}>
+            ⌛ Pedidos en proceso
+          </Text>
+          {enProceso.map((o, orderIndex) => {
+            const idx = o.status && o.status in STATUS_INDEX ? STATUS_INDEX[o.status] : 1;
+            const platosArray = mapPlatos(o.platos);
+            const total = platosArray.reduce((s, i) => s + i.dish.price * i.quantity, 0);
+            const stepsToShow = STEPS; // Mostrar todos los pasos
+            const orderId = (o as any).id || `temp-${orderIndex}`;
+
+            return (
+              <View key={orderId} style={{
                 marginBottom: SPACING.lg,
                 padding: SPACING.md,
                 borderWidth: 1,
                 borderColor: COLORS.grayLight,
-                borderRadius: 10
+                borderRadius: 10,
+                backgroundColor: '#FFF8E1'
               }}>
-                <Text style={{ fontWeight: 'bold', marginBottom: SPACING.sm }}>📦 Orden #{o.id}</Text>
+                <Text style={{ fontWeight: 'bold', marginBottom: SPACING.sm }}>📦 Orden #{orderId}</Text>
                 <Text>💵 Total: ${total.toLocaleString()}</Text>
 
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginVertical: SPACING.md }}>
                   {stepsToShow.map((step, i) => {
-                    const stepIndex = o.paid ? i : i + 1;
-                    const isActive = stepIndex <= idx;
+                    const isActive = i <= idx;
                     return (
                       <View key={step.key} style={{ alignItems: 'center', flex: 1 }}>
                         <MaterialCommunityIcons
@@ -174,37 +264,13 @@ export default function Estado() {
                 {platosArray.map((i, index) => (
                   <Text key={index}>🍽 {i.dish.name} ×{i.quantity}</Text>
                 ))}
-
-                {!o.paid && (
-                  <TouchableOpacity
-                    style={{
-                      marginTop: SPACING.sm,
-                      backgroundColor: COLORS.primary,
-                      padding: SPACING.sm,
-                      borderRadius: 8,
-                      alignItems: 'center',
-                    }}
-                    onPress={() => {
-                      router.push({
-                        pathname: '/pago',
-                        params: {
-                          mesaId: mesa_id ?? o.mesa_id ?? '',
-                          sillaId: silla_id ?? o.silla_id ?? '',
-                          userId: user_id ?? '',
-                          restauranteId: restaurante_id ?? '',
-                        },
-                      });
-                    }}
-                  >
-                    <Text style={{ color: '#fff', fontWeight: 'bold' }}>Ir a pagar este pedido</Text>
-                  </TouchableOpacity>
-                )}
               </View>
             );
           })}
         </View>
       )}
 
+      {/* Pedidos completados */}
       {completados.length > 0 && (
         <>
           <Text style={{
@@ -214,19 +280,20 @@ export default function Estado() {
           }}>
             📚 Historial de pedidos
           </Text>
-          {completados.map(o => {
+          {completados.map((o, orderIndex) => {
             const platosArray = mapPlatos(o.platos);
             const doneTime = new Date(o.created_at || 0).getTime() + (o.estimatedTime || 0) * 60 * 1000;
+            const orderId = (o as any).id || `temp-${orderIndex}`;
 
             return (
-              <View key={o.id} style={{
+              <View key={orderId} style={{
                 marginBottom: SPACING.md,
                 padding: SPACING.md,
                 backgroundColor: COLORS.grayLight,
                 borderRadius: 10
               }}>
                 <Text style={{ fontWeight: 'bold' }}>
-                  Orden #{o.id} — completada a las {formatTime(doneTime)}
+                  Orden #{orderId} — completada a las {formatTime(doneTime)}
                 </Text>
                 {platosArray.map((i, ix) => (
                   <Text key={ix}>• {i.dish.name} ×{i.quantity}</Text>
@@ -238,8 +305,36 @@ export default function Estado() {
         </>
       )}
 
-      {activos.length === 0 && completados.length === 0 && (
-        <Text>🕐 No hay pedidos registrados para esta mesa.</Text>
+      {listosPagar.length === 0 && enProceso.length === 0 && completados.length === 0 && (
+        <View style={{ alignItems: 'center', marginTop: SPACING.xl }}>
+          <Text style={{ fontSize: FONT_SIZES.subtitle, color: COLORS.grayDark }}>
+            🕐 No hay pedidos registrados para esta mesa.
+          </Text>
+          <TouchableOpacity
+            style={{
+              marginTop: SPACING.lg,
+              backgroundColor: COLORS.primary,
+              padding: SPACING.md,
+              borderRadius: 10,
+              alignItems: 'center',
+            }}
+            onPress={() => {
+              router.push({
+                pathname: '/carta',
+                params: {
+                  mesaId: mesa_id ?? '',
+                  sillaId: silla_id ?? '',
+                  userId: user_id ?? '',
+                  restauranteId: restaurante_id ?? '',
+                },
+              });
+            }}
+          >
+            <Text style={{ color: '#fff', fontWeight: 'bold' }}>
+              🍽️ Ver carta y hacer pedido
+            </Text>
+          </TouchableOpacity>
+        </View>
       )}
     </ScrollView>
   );
