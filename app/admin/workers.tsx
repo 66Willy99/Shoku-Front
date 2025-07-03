@@ -8,6 +8,7 @@ import Icon from "react-native-vector-icons/FontAwesome";
 import Swal from "sweetalert2";
 import { Picker } from "@react-native-picker/picker";
 import { Image } from "react-native";
+import LoadingScreen from '@/components/ui/LoadingScreen'; 
 
 type Employee = {
     id: string;
@@ -187,6 +188,14 @@ export default function Workers() {
     useEffect(() => {
         fetchEmployees();
     }, []);
+
+    if (isSubmitting) {
+        return (<LoadingScreen message="Actualizando trabajadores..." />);
+    }   
+
+    if (loading) {
+        return (<LoadingScreen message="Cargando trabajadores..." />);
+    }   
 
     return (
         <View style={styles.container}>

@@ -10,6 +10,7 @@ import { Picker } from "@react-native-picker/picker";
 import Icon from 'react-native-vector-icons/FontAwesome';
 import Swal from 'sweetalert2';
 import { useSweetAlertWatcher } from '@/hooks/sweetAlertWatcher';
+import { useSubscription } from '@/context/subscriptionContext';
 
 type Mesa = {
     capacidad: number;
@@ -26,6 +27,7 @@ export default function MesaTable() {
     const [isCreating, setIsCreating] = useState(false);
     const [showTable, setShowTable] = useState(true);
     const [showForm, setShowForm] = useState(false);
+    const [totalSillasActuales, setTotalSillasActuales] = useState<number>(0);
 
     const tableMargin = useRef(new Animated.Value(0)).current;
     const formOpacity = useRef(new Animated.Value(0)).current;
@@ -36,6 +38,8 @@ export default function MesaTable() {
     interface SillasResponse {
         sillas: { [id: string]: Silla };
     }
+
+    const { puedeCrearMesa, puedeCrearSilla ,limites } = useSubscription();
 
     useSweetAlertWatcher(
         () => {
@@ -64,6 +68,19 @@ export default function MesaTable() {
             console.error('Error al obtener mesas:', err);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchSillasTotales = async () => {
+        try {
+            const userId = await AsyncStorage.getItem('userId');
+            const restauranteId = await AsyncStorage.getItem('restaurantId');
+            const res = await fetch(`${Config.API_URL}/silla/all?user_id=${userId}&restaurante_id=${restauranteId}`);
+            const data = await res.json();
+            const total = Object.keys(data.sillas || {}).length;
+            setTotalSillasActuales(total);
+        } catch (error) {
+            console.error('Error obteniendo sillas:', error);
         }
     };
 
@@ -196,6 +213,15 @@ export default function MesaTable() {
             //region Crear sillas
             if (nuevaCantidad > cantidadActual) {
                 const sillasPorCrear = nuevaCantidad - cantidadActual;
+                if (!puedeCrearSilla(totalSillasActuales, sillasPorCrear)) {
+                    Swal.fire({
+                        title: 'Límite de sillas alcanzado',
+                        text: `Tu plan solo permite hasta ${limites.sillas} sillas totales.`,
+                        icon: 'warning',
+                    });
+                    setIsSubmitting(false);
+                    return;
+                }
                 for (let i = 0; i < sillasPorCrear; i++) {
                     const numeroSilla = cantidadActual + i + 1;
                     await fetch(`${Config.API_URL}/silla/`, {
@@ -308,6 +334,7 @@ export default function MesaTable() {
 
     useEffect(() => {
         fetchMesas();
+        fetchSillasTotales();
     }, []);
 
     //region Pantallas de carga
@@ -431,6 +458,14 @@ export default function MesaTable() {
                 <Pressable
                     style={styles.floatingButton}
                     onPress={() => {
+                        if (!puedeCrearMesa(Object.keys(mesas).length)) {
+                            Swal.fire({
+                                title: 'Límite alcanzado',
+                                text: `Tu plan actual solo permite hasta ${limites.mesas} mesas.`,
+                                icon: 'warning',
+                            });
+                            return;
+                        }
                         setFormValues({ capacidad: 0, numero: 0, estado: 'disponible' });
                         setSelectedMesaId(null);
                         setIsCreating(true);

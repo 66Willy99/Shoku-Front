@@ -5,6 +5,7 @@ import CustomHeader from '../../components/ui/CustomHeader';
 import { useAuth } from '@/context/authContext';
 import { getSession } from '@/services/sessionService'; 
 import { Colors } from '@/constants/Colors'; 
+import { SubscriptionProvider } from '@/context/subscriptionContext';
 
 export default function AdminLayout() {
     const { isAuthenticated, loading } = useAuth();
@@ -67,23 +68,26 @@ export default function AdminLayout() {
     }
 
     return (
-        <View style={{ flex: 1, backgroundColor: Colors.bg_light, position: 'relative', overflow: 'visible', zIndex: 0 }}> 
-        <CustomHeader excludeRoutes={['/admin']} />
-        <Stack
-            screenOptions={{
-            headerShown: false,
-            }}
-        >
-            <Stack.Screen name="index" options={{ headerShown: false }} />
-            <Stack.Screen name="add-restaurant" />
-            <Stack.Screen name="reports" />
-            <Stack.Screen name="restaurant" />
-            <Stack.Screen name="workers" />
-            <Stack.Screen name="tables" />
-            <Stack.Screen name="categories" />
-            <Stack.Screen name="dishes" />
-            <Stack.Screen name="cocina" />
-        </Stack>
-        </View>
+        <SubscriptionProvider>
+            <View style={{ flex: 1, backgroundColor: Colors.bg_light, position: 'relative', overflow: 'visible', zIndex: 0 }}> 
+            <CustomHeader excludeRoutes={['/admin']} />
+                <Stack
+                    screenOptions={{
+                    headerShown: false,
+                    }}
+                >
+                    <Stack.Screen name="index" options={{ headerShown: false }} />
+                    <Stack.Screen name="add-restaurant" />
+                    <Stack.Screen name="reports" />
+                    <Stack.Screen name="restaurant" />
+                    <Stack.Screen name="workers" />
+                    <Stack.Screen name="tables" />
+                    <Stack.Screen name="categories" />
+                    <Stack.Screen name="dishes" />
+                    <Stack.Screen name="cocina" />
+                    <Stack.Screen name="subscription" />
+                </Stack>
+            </View>
+        </SubscriptionProvider>
     );
 }
