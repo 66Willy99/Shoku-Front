@@ -51,16 +51,7 @@ const CocinaLayout = ({ children }: { children: React.ReactNode }) => {
 
                 // 2. Agrega cada card básica apenas llega el ID
                 pedidoIds.forEach((pedido_id) => {
-                    setPedidos(prev => [
-                        ...prev,
-                        {
-                            pedido_id,
-                            mesa_numero: 'Cargando...',
-                            platos: [],
-                            estado_actual: 'cargando',
-                            detalle: 'Cargando...' 
-                        }
-                    ]);
+                    if (!pedido_id) return;
                     // 3. Obtén detalles y actualiza la card al llegar
                     (async () => {
                         try {
@@ -70,6 +61,7 @@ const CocinaLayout = ({ children }: { children: React.ReactNode }) => {
                             const detalleData = await detalleRes.json();
                             const detalle = detalleData.pedido_detalle;
                             if (!detalle) return;
+                            
                             const pedidoActualizado = {
                                 pedido_id,
                                 mesa_numero: detalle.mesa,
@@ -80,13 +72,19 @@ const CocinaLayout = ({ children }: { children: React.ReactNode }) => {
                                 estado_actual: detalle.estado_actual,
                                 detalle: detalle.detalle, 
                             };
-                            setPedidos(prev =>
-                                prev.map(p =>
-                                    p.pedido_id === pedido_id ? pedidoActualizado : p
-                                )
-                            );
+
+                            // Filtrar según el estado actual del pedido
+                            if (detalle.estado_actual === "confirmado") {
+                                // Estado confirmado - Columna 1
+                                setPedidos(prev => [pedidoActualizado, ...prev]);
+                            } else if (detalle.estado_actual === "preparacion") {
+                                // Estado en preparación - Columna 2
+                                setPedidosPreparacion(prev => [pedidoActualizado, ...prev]);
+                            }
+                            // Los pedidos terminados (estado 2) no se muestran en cocina
+                            
                         } catch (e) {
-                            // Manejo de error opcional
+                            console.error(`Error obteniendo detalle del pedido ${pedido_id}:`, e);
                         }
                     })();
                 });
@@ -225,6 +223,56 @@ const CocinaLayout = ({ children }: { children: React.ReactNode }) => {
             }
         }
     };
+
+    const handleMarcarComoTerminado = async (pedido_id: string) => {
+        const result = await Swal.fire({
+            title: '¿Marcar como terminado?',
+            text: '¿Estás seguro de que el pedido está listo para servir?',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, terminado',
+            cancelButtonText: 'Cancelar',
+        });
+
+        if (result.isConfirmed) {
+            try {
+                const trabajadorStr = await AsyncStorage.getItem("trabajador");
+                if (!trabajadorStr) return;
+                const trabajador = JSON.parse(trabajadorStr);
+                const user_id = trabajador.user_id;
+                const restaurante_id = trabajador.restaurante_id;
+
+                const response = await fetch(
+                    `${APIURL}/pedido`,
+                    {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            pedido_id,
+                            user_id,
+                            restaurante_id,
+                            estado_actual: 2
+                        })
+                    }
+                );
+                if (response.ok) {
+                    // Eliminar el pedido de la lista de preparación
+                    setPedidosPreparacion(prev => prev.filter(p => p.pedido_id !== pedido_id));
+                    
+                    Swal.fire({
+                        title: '¡Pedido terminado!',
+                        text: 'El pedido ha sido marcado como listo para servir.',
+                        icon: 'success',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                }
+            } catch (e) {
+                Swal.fire('Error', 'No se pudo actualizar el pedido.', 'error');
+            }
+        }
+    };
+
     const childrenArray = React.Children.toArray(children);
     if (isSubmitting) {
         return <LoadingScreen message="Cargando pedidos"/>;
@@ -280,7 +328,12 @@ const CocinaLayout = ({ children }: { children: React.ReactNode }) => {
                                     {plato.nombre} x {plato.cantidad}
                                 </Text>
                             ))}
-                            {/* Puedes agregar más acciones aquí si lo deseas */}
+                            <TouchableOpacity
+                                className="mt-2 bg-green-500 text-white text-center py-2 rounded"
+                                onPress={() => handleMarcarComoTerminado(pedido.pedido_id)}
+                            >
+                                <Text className="text-white text-center">Marcar como terminado</Text>
+                            </TouchableOpacity>
                         </View>
                     ))}
                 </ScrollView>

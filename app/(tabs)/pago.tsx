@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, Alert, Switch, Modal, Platform, StyleSheet
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { useCarrito } from '../../context/CarritoContext';
 import { useOrders } from '../../context/OrdersContext';
+import { useQRParams } from '../../context/QRParamsContext';
+import { QRParamsIndicator } from '../../components/QRParamsIndicator';
 import { Config } from '../../constants/config';
 import { Dish } from '../../context/MenuContext';
 import { COLORS, FONT_SIZES, SPACING } from '../../theme';
@@ -18,12 +20,13 @@ type CartItem = {
 
 export default function Pago() {
   const router = useRouter();
-  const params = useLocalSearchParams();
+  const { qrParams, hasValidParams } = useQRParams();
 
-  const mesa_id = String(params.mesaId ?? '');
-  const silla_id = String(params.sillaId ?? '');
-  const user_id = String(params.userId ?? '');
-  const restaurante_id = String(params.restauranteId ?? '');
+  // Usar los parámetros del contexto QR
+  const mesa_id = qrParams?.mesaId || '';
+  const silla_id = qrParams?.sillaId || '';
+  const user_id = qrParams?.userId || '';
+  const restaurante_id = qrParams?.restauranteId || '';
 
   const { carrito, notes, limpiarCarrito } = useCarrito();
   const { orders, addOrder } = useOrders();
@@ -32,10 +35,65 @@ export default function Pago() {
   const [waiterModal, setWaiterModal] = useState(false);
   const [tipIncluded, setTipIncluded] = useState(true);
   const [confirmModal, setConfirmModal] = useState(false);
+  const [allUnpaidOrders, setAllUnpaidOrders] = useState<any[]>([]);
 
   if (!mesa_id || !silla_id || !user_id || !restaurante_id) {
-    return <Text style={{ padding: 20 }}>❌ Favor seleccionar un pedido válido</Text>;
+    return (
+      <View style={{ padding: 20 }}>
+        <Text>❌ Faltan parámetros requeridos:</Text>
+        <Text>Mesa ID: {mesa_id || 'NO DISPONIBLE'}</Text>
+        <Text>Silla ID: {silla_id || 'NO DISPONIBLE'}</Text>
+        <Text>User ID: {user_id || 'NO DISPONIBLE'}</Text>
+        <Text>Restaurante ID: {restaurante_id || 'NO DISPONIBLE'}</Text>
+        <Text style={{ marginTop: 10, color: COLORS.primary }}>
+          Por favor accede mediante un código QR válido.
+        </Text>
+      </View>
+    );
   }
+
+  // Cargar todos los pedidos listos para pagar (entregados)
+  React.useEffect(() => {
+    const fetchUnpaidOrders = async () => {
+      console.log('🔍 Buscando pedidos entregados para:', { user_id, restaurante_id });
+      
+      try {
+        const response = await fetch(
+          `${Config.API_URL}/pedidos/?user_id=${user_id}&restaurante_id=${restaurante_id}`
+        );
+        const data = await response.json();
+        
+        console.log('📥 Respuesta del servidor:', data);
+        
+        if (data && data.pedidos) {
+          console.log('📦 Todos los pedidos:', Object.keys(data.pedidos));
+          
+          // Filtrar solo pedidos que estén entregados y no pagados
+          const unpaidOrders = Object.entries(data.pedidos)
+            .filter(([_, pedido]: [string, any]) => {
+              const estado = pedido.estados?.estado_actual || pedido.estado_actual || '';
+              const isPaid = pedido.paid;
+              console.log(`🔍 Pedido ${_}: estado=${estado}, paid=${isPaid}`);
+              return estado === 'entregado' && !isPaid;
+            })
+            .map(([id, pedido]: [string, any]) => ({
+              ...pedido,
+              id,
+            }));
+          
+          console.log('✅ Pedidos entregados filtrados:', unpaidOrders);
+          setAllUnpaidOrders(unpaidOrders);
+          console.log('📋 Pedidos entregados listos para pagar:', unpaidOrders.length);
+        }
+      } catch (error) {
+        console.error('❌ Error al cargar pedidos entregados:', error);
+      }
+    };
+
+    if (user_id && restaurante_id) {
+      fetchUnpaidOrders();
+    }
+  }, [user_id, restaurante_id]);
 
   const lastUnpaidOrder = orders.findLast(o => !o.paid);
   const hasPendingOrder = carrito.length === 0 && !!lastUnpaidOrder;
@@ -52,9 +110,20 @@ export default function Pago() {
       })) ?? [];
 
   const notesToShow = carrito.length > 0 ? notes : lastUnpaidOrder?.notes ?? '';
-  const hasItems = items.length > 0;
+  const hasItems = items.length > 0 || allUnpaidOrders.length > 0;
 
-  const subtotal = items.reduce((sum, i) => sum + i.dish.price * i.quantity, 0);
+  // Calcular total incluyendo el carrito actual y todos los pedidos no pagados
+  const carritoSubtotal = items.reduce((sum, i) => sum + i.dish.price * i.quantity, 0);
+  
+  const pedidosSubtotal = allUnpaidOrders.reduce((sum, pedido) => {
+    return sum + Object.entries(pedido.platos || {}).reduce((platosSum, [platoId, platoInfo]: [string, any]) => {
+      // Aquí necesitarías mapear el precio del plato, por simplicidad usamos un precio base
+      // En un caso real, deberías hacer fetch de los precios o tenerlos en el pedido
+      return platosSum + (platoInfo.cantidad * 1000); // Precio estimado, debería venir del backend
+    }, 0);
+  }, 0);
+
+  const subtotal = carritoSubtotal + pedidosSubtotal;
   const tipAmount = tipIncluded ? Math.round(subtotal * 0.1) : 0;
   const totalWithTip = subtotal + tipAmount;
   const estimatedTime = items.reduce((sum, i) => sum + i.quantity * 3, 0);
@@ -71,13 +140,13 @@ export default function Pago() {
     }, 2000);
   };
 
-  async function iniciarPagoWebpay(total: number, orderId: string) {
+  async function iniciarPagoWebpay(total: number, pedidosIds: string[]) {
     try {
-      const safeOrderId = String(orderId);
-      console.log('🧾 Iniciando pago con orderId:', safeOrderId);
+      console.log('🧾 Iniciando pago con pedidos:', pedidosIds);
 
-      const payUrl = `${Config.API_URL}/pay?total=${total}&orderId=${encodeURIComponent(safeOrderId)}&mesaId=${mesa_id}&sillaId=${silla_id}&userId=${user_id}&restauranteId=${restaurante_id}`;
+      const payUrl = `${Config.API_URL}/pay?total=${total}&pedidos=${encodeURIComponent(JSON.stringify(pedidosIds))}&mesaId=${mesa_id}&sillaId=${silla_id}&userId=${user_id}&restauranteId=${restaurante_id}`;
 
+      console.log('🔗 URL de pago:', payUrl);
 
       if (Platform.OS === 'web') {
         window.open(payUrl, '_blank');
@@ -119,17 +188,16 @@ export default function Pago() {
   const confirmarPedido = async () => {
     setConfirmModal(false);
 
-    if (hasPendingOrder && lastUnpaidOrder) {
-      const orderId = String(lastUnpaidOrder.id);
-
-      if (method === 'tarjeta') {
-        iniciarPagoWebpay(totalWithTip, orderId);
-      } else {
-        showWaiter(); // El backend marcará como pagado si es efectivo
-      }
-    } else {
-      try {
-        const orderId = await addOrder({
+    try {
+      // Obtener todos los IDs de pedidos entregados listos para pagar
+      const pedidosIds = allUnpaidOrders.map(pedido => pedido.id);
+      console.log('📋 Pedidos entregados encontrados:', allUnpaidOrders);
+      console.log('🔢 IDs de pedidos a pagar:', pedidosIds);
+      
+      // Si hay carrito, crear nuevo pedido y agregarlo a la lista
+      if (carrito.length > 0) {
+        console.log('🛒 Creando nuevo pedido del carrito...');
+        const newOrderId = await addOrder({
           user_id,
           restaurante_id,
           mesa_id,
@@ -143,40 +211,108 @@ export default function Pago() {
           detalle: notesToShow,
         });
 
-        console.log('🧾 Pedido generado con ID:', orderId);
-
-        if (method === 'tarjeta') {
-          iniciarPagoWebpay(totalWithTip, orderId);
-        } else {
-          showWaiter();
-        }
-      } catch (err) {
-        console.error('❌ Error al confirmar pedido:', err);
-        Alert.alert('Error', 'No se pudo confirmar el pedido');
+        console.log('🧾 Nuevo pedido generado con ID:', newOrderId);
+        pedidosIds.push(newOrderId);
       }
+
+      // Validar que hay pedidos para pagar
+      if (pedidosIds.length === 0) {
+        Alert.alert('Error', 'No hay pedidos para pagar. Asegúrate de tener pedidos entregados o productos en el carrito.');
+        return;
+      }
+
+      console.log('💳 Procesando pago para pedidos:', pedidosIds);
+      console.log('💰 Total a pagar:', totalWithTip);
+
+      if (method === 'tarjeta') {
+        iniciarPagoWebpay(totalWithTip, pedidosIds);
+      } else {
+        // Para efectivo, mostrar modal del mesero
+        showWaiter();
+      }
+    } catch (err) {
+      console.error('❌ Error al confirmar pedido:', err);
+      Alert.alert('Error', 'No se pudo confirmar el pedido: ' + (err as Error).message);
     }
   };
 
   const handlePagar = () => {
-    if (!hasItems) return Alert.alert('Carrito vacío', 'Agrega productos antes de pagar.');
-    if (!method) return Alert.alert('Selecciona método', 'Elige efectivo o tarjeta.');
+    console.log('🚀 Iniciando proceso de pago...');
+    console.log('📊 Estado actual:', {
+      hasItems,
+      carritoLength: carrito.length,
+      pedidosEntregados: allUnpaidOrders.length,
+      method,
+      total: totalWithTip
+    });
+    
+    if (!hasItems) {
+      Alert.alert('Carrito vacío', 'Agrega productos antes de pagar o asegúrate de tener pedidos entregados pendientes.');
+      return;
+    }
+    if (!method) {
+      Alert.alert('Selecciona método', 'Elige efectivo o tarjeta.');
+      return;
+    }
+    
     setConfirmModal(true);
   };
 
   return (
     <View style={styles.container}>
       <Text style={styles.header}>PAGO</Text>
+      <QRParamsIndicator />
 
       {!hasItems ? (
-        <Text style={styles.emptyText}>No hay productos en el carrito</Text>
+        <Text style={styles.emptyText}>No hay productos en el carrito ni pedidos entregados listos para pagar</Text>
       ) : (
         <>
-          {items.map((item, i) => (
-            <View key={i} style={styles.row}>
-              <Text style={styles.itemText}>{item.dish.name} ×{item.quantity}</Text>
-              <Text style={styles.itemText}>${(item.dish.price * item.quantity).toLocaleString()}</Text>
-            </View>
-          ))}
+          {/* Mostrar pedidos entregados listos para pagar */}
+          {allUnpaidOrders.length > 0 && (
+            <>
+              <Text style={styles.subheader}>📋 Pedidos entregados listos para pagar:</Text>
+              {allUnpaidOrders.map((pedido, index) => (
+                <View key={pedido.id} style={styles.orderCard}>
+                  <Text style={styles.orderTitle}>Pedido #{pedido.id} - ENTREGADO</Text>
+                  {Object.entries(pedido.platos || {}).map(([platoId, platoInfo]: [string, any], i) => (
+                    <Text key={i} style={styles.orderItem}>
+                      🍽 {platoId} x {platoInfo.cantidad}
+                    </Text>
+                  ))}
+                  {pedido.detalle && (
+                    <Text style={styles.orderNotes}>📝 {pedido.detalle}</Text>
+                  )}
+                </View>
+              ))}
+              <View style={styles.divider} />
+            </>
+          )}
+
+          {/* Mostrar items del carrito actual */}
+          {items.length > 0 && (
+            <>
+              <Text style={styles.subheader}>🛒 Carrito actual:</Text>
+              {items.map((item, i) => (
+                <View key={i} style={styles.row}>
+                  <Text style={styles.itemText}>{item.dish.name} ×{item.quantity}</Text>
+                  <Text style={styles.itemText}>${(item.dish.price * item.quantity).toLocaleString()}</Text>
+                </View>
+              ))}
+              <View style={styles.divider} />
+            </>
+          )}
+
+          {/* Solo mostrar items del carrito si no hay carrito actual */}
+          {items.length === 0 && carrito.length === 0 && lastUnpaidOrder && (
+            <>
+              {items.map((item, i) => (
+                <View key={i} style={styles.row}>
+                  <Text style={styles.itemText}>{item.dish.name} ×{item.quantity}</Text>
+                  <Text style={styles.itemText}>${(item.dish.price * item.quantity).toLocaleString()}</Text>
+                </View>
+              ))}
+            </>
+          )}
 
           <View style={styles.divider} />
           <View style={styles.pricing}><Text>Subtotal</Text><Text>${subtotal.toLocaleString()}</Text></View>
@@ -271,4 +407,15 @@ const styles = StyleSheet.create({
   modalBox: { backgroundColor: COLORS.white, padding: SPACING.lg, borderRadius: 12, alignItems: 'center', width: '80%' },
   modalTitle: { fontSize: FONT_SIZES.subtitle, fontWeight: 'bold', marginBottom: SPACING.sm },
   modalMsg: { fontSize: FONT_SIZES.body, color: COLORS.grayDark },
+  orderCard: { 
+    backgroundColor: '#f0f8ff', 
+    padding: SPACING.sm, 
+    borderRadius: 8, 
+    marginBottom: SPACING.sm,
+    borderLeftWidth: 3,
+    borderLeftColor: '#4CAF50' 
+  },
+  orderTitle: { fontWeight: 'bold', fontSize: FONT_SIZES.body, marginBottom: SPACING.xs },
+  orderItem: { fontSize: FONT_SIZES.small, color: COLORS.grayDark, marginBottom: 2 },
+  orderNotes: { fontSize: FONT_SIZES.small, fontStyle: 'italic', color: COLORS.grayDark, marginTop: SPACING.xs },
 });

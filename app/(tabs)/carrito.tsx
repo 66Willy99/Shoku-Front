@@ -4,14 +4,21 @@ import {
   View, Text, ScrollView, TouchableOpacity,
   TextInput, StyleSheet, Modal, Alert,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useCarrito, CartItem } from '../../context/CarritoContext';
 import { useOrders } from '../../context/OrdersContext';
+import { useQRParams } from '../../context/QRParamsContext';
 import { COLORS, FONT_SIZES, SPACING } from '../../theme';
 
 export default function Carrito() {
   const router = useRouter();
-  const { userId, restauranteId, mesaId, sillaId } = useLocalSearchParams();
+  const { qrParams, hasValidParams } = useQRParams();
+
+  // Usar los parámetros del contexto QR
+  const userId = qrParams?.userId || '';
+  const restauranteId = qrParams?.restauranteId || '';
+  const mesaId = qrParams?.mesaId || '';
+  const sillaId = qrParams?.sillaId || '';
 
   const { carrito, notes, setNotes, removeProducto, limpiarCarrito, total } = useCarrito();
   const { addOrder } = useOrders();

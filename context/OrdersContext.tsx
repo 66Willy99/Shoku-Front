@@ -8,7 +8,6 @@ function generateShortId(): string {
 }
 
 export type Order = {
-  id: string;
   user_id: string;
   restaurante_id: string;
   mesa_id: string;
@@ -64,10 +63,7 @@ export const OrdersProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         platosBackendFormat[plato.id] = { cantidad: plato.quantity };
       });
 
-      const orderId = generateShortId();
-
       const payload = {
-        id: orderId,
         user_id: orderData.user_id,
         restaurante_id: orderData.restaurante_id,
         mesa_id: orderData.mesa_id,
@@ -78,13 +74,20 @@ export const OrdersProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
       console.log('🛒 Enviando pedido al backend:', payload);
 
-
-      await axios.post(`${Config.API_URL}/pedido/`, payload, {
+      const response = await axios.post(`${Config.API_URL}/pedido/`, payload, {
         headers: { 'Content-Type': 'application/json' },
       });
 
+      // Extraer el pedido_id del response
+      const { pedido_id } = response.data;
+      
+      if (!pedido_id) {
+        throw new Error('El backend no retornó un pedido_id válido');
+      }
+
+      console.log('✅ Pedido creado con ID:', pedido_id);
+
       const newOrder: Order = {
-        id: orderId,
         user_id: orderData.user_id,
         restaurante_id: orderData.restaurante_id,
         mesa_id: orderData.mesa_id,
@@ -101,7 +104,9 @@ export const OrdersProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
       setOrders((prev) => [...prev, newOrder]);
       console.log('✅ Pedido creado exitosamente:', newOrder);
-      return orderId;
+      
+      // Retornar el pedido_id real del backend en lugar del generado localmente
+      return pedido_id;
     } catch (err: any) {
       console.error('❌ Error al crear el pedido:', err.response?.data || err.message);
       throw err;

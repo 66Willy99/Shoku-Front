@@ -35,7 +35,7 @@ export default function EstadoPedidos() {
   const renderPedido = ({ item }: { item: Pedido }) => (
     <TouchableOpacity
       style={styles.pedidoItem}
-      onPress={() => router.push(`/garzon/entrega?id=${item._id}`)}
+      onPress={() => router.push(`/garzon/entrega?id=${item.id}`)}
     >
       <Text style={styles.pedidoNombre}>Pedido #{item.numero}</Text>
       <Text style={styles.pedidoEstado}>Mesa: {item.mesa} - {item.estado}</Text>
@@ -51,11 +51,11 @@ export default function EstadoPedidos() {
   const colorEstado = (estado: string) => {
     switch (estado.toLowerCase()) {
       case "en preparación":
-        return COLORS.warning;
+        return COLORS.primary;
       case "terminado":
-        return COLORS.success;
+        return COLORS.secondary;
       default:
-        return COLORS.gray;
+        return COLORS.grayLight;
     }
   };
 
@@ -71,7 +71,7 @@ export default function EstadoPedidos() {
       ) : (
         <FlatList
           data={pedidos}
-          keyExtractor={(item) => item._id}
+          keyExtractor={(item) => item.id}
           renderItem={renderPedido}
           contentContainerStyle={{ paddingBottom: SPACING.lg }}
         />

@@ -7,13 +7,14 @@ import {
   Modal,
   StyleSheet,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { COLORS, FONT_SIZES, SPACING } from '../../theme';
 import { useOrders } from '../../context/OrdersContext';
+import { useQRParams } from '../../context/QRParamsContext';
 
 export default function Home() {
   const router = useRouter();
-  const { userId, restauranteId, mesaId, sillaId } = useLocalSearchParams();
+  const { qrParams } = useQRParams();
 
   const [waiterModal, setWaiterModal] = useState(false);
   const { orders } = useOrders();
@@ -26,27 +27,11 @@ export default function Home() {
   const tienePedidoNoPagado = orders.some(o => !o.paid);
 
   const irACarta = () => {
-    router.push({
-      pathname: '/carta',
-      params: {
-        userId,
-        restauranteId,
-        mesaId,
-        sillaId,
-      },
-    });
+    router.push('/carta');
   };
 
   const irAPago = () => {
-    router.push({
-      pathname: '/pago',
-      params: {
-        userId,
-        restauranteId,
-        mesaId,
-        sillaId,
-      },
-    });
+    router.push('/pago');
   };
 
   return (

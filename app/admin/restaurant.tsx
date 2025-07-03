@@ -170,7 +170,6 @@ export default function AdminScreen() {
 
     return (
         <View style={styles.container}>
-            <Text style={styles.title}>Restaurante</Text>
             <ScrollView contentContainerStyle={{ flexDirection: "row", flexWrap: "wrap", gap: 16 }}>
                 {mesas.map((mesa) => (
                     <TouchableOpacity
