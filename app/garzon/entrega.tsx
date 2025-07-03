@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
   entregarBtn: {
-    backgroundColor: COLORS.success,
+    backgroundColor: COLORS.primary,
     paddingVertical: SPACING.md,
     alignItems: 'center',
     borderRadius: 10,
