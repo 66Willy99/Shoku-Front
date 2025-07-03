@@ -17,9 +17,12 @@ const GAP = SPACING.sm;
 const CARD_W = (SCREEN_WIDTH - H_PAD * 2 - GAP) / 2;
 
 type Dish = {
+  id: string;
   name: string;
   price: number;
   description?: string;
+  imagenUrl?: string[];
+  image?: string;
 };
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
@@ -40,6 +43,15 @@ export default function Carta() {
   const recommended = allDishes.slice(0, 6);
   const carouselRef = useRef<ScrollView>(null);
   let idx = 0;
+
+  // Log para depurar las imágenes
+  useEffect(() => {
+    console.log("🖼️ Platos en carta con imágenes:", allDishes.map(dish => ({
+      name: dish.name,
+      image: dish.image,
+      imagenUrl: dish.imagenUrl
+    })));
+  }, [allDishes]);
 
   useEffect(() => {
     if (recommended.length < 2) return;
@@ -119,7 +131,22 @@ function Card({ dish }: { dish: Dish }) {
 
   const scale = useRef(new Animated.Value(1)).current;
   const [feedback, setFeedback] = useState('');
+  const [imageError, setImageError] = useState(false);
   const fbOpacity = useRef(new Animated.Value(0)).current;
+
+  // Determinar la fuente de la imagen
+  const getImageSource = () => {
+    // Si hay una imagen del backend y no hay error, usarla
+    if (dish.image && !imageError) {
+      return { uri: dish.image };
+    }
+    // Fallback a imagen local si existe
+    if (dishImages[dish.name]) {
+      return dishImages[dish.name];
+    }
+    // Si no hay imagen, usar una imagen por defecto o placeholder
+    return require('../../assets/images/icon.png'); // Usando el ícono de la app como fallback
+  };
 
   const bump = () => {
     Animated.sequence([
@@ -149,9 +176,19 @@ function Card({ dish }: { dish: Dish }) {
     showFeedback(isFav ? 'Quitado' : 'Favorito');
   };
 
+  const handleImageError = () => {
+    console.log(`⚠️ Error cargando imagen para ${dish.name}: ${dish.image}`);
+    setImageError(true);
+  };
+
   return (
     <View style={styles.card}>
-      <Image source={dishImages[dish.name]} style={styles.image} />
+      <Image 
+        source={getImageSource()} 
+        style={styles.image}
+        onError={handleImageError}
+        resizeMode="cover"
+      />
       <View style={styles.info}>
         <Text style={styles.name}>{dish.name}</Text>
         <Text style={styles.price}>${dish.price.toLocaleString()}</Text>

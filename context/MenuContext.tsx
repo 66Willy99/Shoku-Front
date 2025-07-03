@@ -10,6 +10,8 @@ export type Dish = {
   name: string;
   price: number;
   description?: string;
+  imagenUrl?: string[]; // URLs de las imágenes
+  image?: string; // URL principal de la imagen para compatibilidad
 };
 
 // Tipo del contexto
@@ -49,8 +51,11 @@ export const MenuProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             name: item.nombre,
             price: item.precio,
             description: item.descripcion,
+            imagenUrl: item.imagenUrl || [],
+            image: item.imagenUrl && item.imagenUrl[0] ? item.imagenUrl[0] : undefined,
           })
         );
+        console.log("🖼️ Platos con imágenes:", mappedDishes);
         setPlatos(mappedDishes);
       } else {
         console.warn("⚠️ La propiedad 'platos' no es un objeto válido:", res.data);
