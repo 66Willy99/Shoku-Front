@@ -13,20 +13,19 @@ import { useMenu } from '../../context/MenuContext';
 import { Dish } from '../../context/MenuContext';
 
 const STEPS = [
-  { key: 'pagado', icon: 'credit-card-check', label: 'Pagado' },
   { key: 'confirmado', icon: 'check-circle', label: 'Pedido confirmado' },
-  { key: 'en progreso', icon: 'silverware-fork-knife', label: 'En preparación' },
-  { key: 'listo', icon: 'clock-end', label: 'Terminado' },
+  { key: 'preparacion', icon: 'silverware-fork-knife', label: 'En preparación' },
+  { key: 'terminado', icon: 'clock-end', label: 'Terminado' },
   { key: 'entregado', icon: 'food-fork-drink', label: 'Entregado' },
+  { key: 'pagado', icon: 'credit-card-check', label: 'Pagado' }
 ];
 
 const STATUS_INDEX: Record<string, number> = {
-  'pagado': 0,
-  'confirmado': 1,
-  'en progreso': 2,
-  'listo': 3,
-  'entregado': 4,
-  'completado': 4,
+  'confirmado': 0,
+  'preparacion': 1,
+  'terminado': 2,
+  'entregado': 3,
+  'pagado': 4
 };
 
 export default function Estado() {
@@ -70,29 +69,35 @@ export default function Estado() {
     const fetchPedidos = async () => {
       try {
         const res = await fetch(
-          `${Config.API_URL}/pedidos/?user_id=${user_id}&restaurante_id=${restaurante_id}`
+          `${Config.API_URL}/pedidos/mesa/?user_id=${user_id}&restaurante_id=${restaurante_id}&mesa_id=${mesa_id}`,
         );
         if (!res.ok) return;
 
         const data = await res.json();
+        console.log("📦 Response completo de pedidos:", data);
+        
         if (data && data.pedidos) {
           const pedidosArray: Order[] = Object.entries(data.pedidos).map(
             ([id, pedido]: [string, any]) => {
-              const estado = (
-                pedido.estado_actual || 
-                pedido.estados?.estado_actual || 
-                'confirmado'
-              ).toLowerCase();
+              console.log(`📝 Procesando pedido ${id}:`, pedido);
+              
+              // Extraer el estado actual desde la estructura anidada
+              const estadoActual = pedido.estados?.estado_actual || 'confirmado';
+              
+              console.log(`🎯 Estado actual del pedido ${id}: ${estadoActual}`);
 
               return {
                 ...pedido,
                 id,
-                estado_actual: estado,
-                status: estado,
-                paid: estado === 'pagado',
+                estado_actual: estadoActual,
+                status: estadoActual,
+                paid: estadoActual === 'pagado',
+                created_at: pedido.estados?.confirmado || Date.now(), // Usar timestamp de confirmado
               };
             }
           );
+          
+          console.log("🎯 Pedidos procesados:", pedidosArray);
           setOrders(pedidosArray);
         }
       } catch (err) {
@@ -101,20 +106,19 @@ export default function Estado() {
     };
 
     fetchPedidos();
-    const interval = setInterval(fetchPedidos, 8000);
-    return () => clearInterval(interval);
-  }, [user_id, restaurante_id]);
+  }, [user_id, restaurante_id, mesa_id]);
 
-  // Pedidos listos para pagar (entregados pero no pagados)
+  // Pedidos listos para pagar (listos y entregados pero no pagados)
   const listosPagar = orders.filter(o => {
-    const estado = o.status || o.estado_actual || '';
-    return estado === 'entregado' && !o.paid;
+    const estado = o.estado_actual;
+    console.log(`🔍 Verificando pedido ${(o as any).id}: estado="${estado}", paid=${o.paid}`);
+    return (estado === 'entregado') && !o.paid;
   });
 
-  // Pedidos en proceso (confirmados, en progreso, listos)
+  // Pedidos en proceso (confirmados, preparacion)
   const enProceso = orders.filter(o => {
     const estado = o.status || o.estado_actual || '';
-    return ['confirmado', 'en progreso', 'listo'].includes(estado);
+    return ['confirmado', 'preparacion', 'terminado'].includes(estado);
   });
 
   // Pedidos completados (pagados)
@@ -122,6 +126,8 @@ export default function Estado() {
     const estado = o.status || o.estado_actual || '';
     return o.paid || estado === 'completado';
   });
+
+  console.log(`📊 Estado de pedidos: listos=${listosPagar.length}, proceso=${enProceso.length}, completados=${completados.length}`);
 
   const formatTime = (ms: number) =>
     new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -146,7 +152,7 @@ export default function Estado() {
             color: COLORS.primary,
             fontSize: FONT_SIZES.subtitle 
           }}>
-            💳 Pedidos listos para pagar (entregados)
+            💳 Pedidos listos para pagar (Terminados)
           </Text>
           
           {listosPagar.map((o, orderIndex) => {
@@ -203,7 +209,7 @@ export default function Estado() {
             }}
           >
             <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: FONT_SIZES.body }}>
-              💳 Pagar pedidos entregados ({listosPagar.length})
+              💳 Pagar pedidos listos ({listosPagar.length})
             </Text>
           </TouchableOpacity>
         </View>
@@ -236,8 +242,17 @@ export default function Estado() {
                 borderRadius: 10,
                 backgroundColor: '#FFF8E1'
               }}>
-                <Text style={{ fontWeight: 'bold', marginBottom: SPACING.sm }}>📦 Orden #{orderId}</Text>
+                <Text style={{ fontWeight: 'bold', marginBottom: SPACING.sm }}>
+                  📦 Orden #{orderId} - {o.status?.toUpperCase() || 'CONFIRMADO'}
+                </Text>
                 <Text>💵 Total: ${total.toLocaleString()}</Text>
+                
+                {/* Mostrar timestamp del estado actual si está disponible */}
+                {(o as any).estados && o.status && (o as any).estados[o.status] && (
+                  <Text style={{ color: COLORS.grayDark, fontSize: FONT_SIZES.small }}>
+                    🕐 Actualizado: {new Date((o as any).estados[o.status]).toLocaleString()}
+                  </Text>
+                )}
 
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginVertical: SPACING.md }}>
                   {stepsToShow.map((step, i) => {
@@ -270,40 +285,7 @@ export default function Estado() {
         </View>
       )}
 
-      {/* Pedidos completados */}
-      {completados.length > 0 && (
-        <>
-          <Text style={{
-            fontWeight: 'bold',
-            marginTop: SPACING.lg,
-            marginBottom: SPACING.sm
-          }}>
-            📚 Historial de pedidos
-          </Text>
-          {completados.map((o, orderIndex) => {
-            const platosArray = mapPlatos(o.platos);
-            const doneTime = new Date(o.created_at || 0).getTime() + (o.estimatedTime || 0) * 60 * 1000;
-            const orderId = (o as any).id || `temp-${orderIndex}`;
-
-            return (
-              <View key={orderId} style={{
-                marginBottom: SPACING.md,
-                padding: SPACING.md,
-                backgroundColor: COLORS.grayLight,
-                borderRadius: 10
-              }}>
-                <Text style={{ fontWeight: 'bold' }}>
-                  Orden #{orderId} — completada a las {formatTime(doneTime)}
-                </Text>
-                {platosArray.map((i, ix) => (
-                  <Text key={ix}>• {i.dish.name} ×{i.quantity}</Text>
-                ))}
-                {o.notes && <Text>📋 Notas: {o.notes}</Text>}
-              </View>
-            );
-          })}
-        </>
-      )}
+      
 
       {listosPagar.length === 0 && enProceso.length === 0 && completados.length === 0 && (
         <View style={{ alignItems: 'center', marginTop: SPACING.xl }}>

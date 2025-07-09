@@ -87,6 +87,46 @@ export const OrdersProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
       console.log('✅ Pedido creado con ID:', pedido_id);
 
+      // 🪑 Actualizar estado de la mesa a "ocupado" después de crear el pedido
+      try {
+        console.log('🪑 Actualizando estado de mesa a "ocupado"...');
+        
+        // Primero obtener la información actual de la mesa
+        const mesaResponse = await axios.get(
+          `${Config.API_URL}/mesa/all?user_id=${orderData.user_id}&restaurante_id=${orderData.restaurante_id}`
+        );
+        
+        if (mesaResponse.data && mesaResponse.data.mesas) {
+          const mesaActual = mesaResponse.data.mesas[orderData.mesa_id];
+          
+          if (mesaActual) {
+            // Actualizar el estado de la mesa a "ocupado"
+            const mesaPayload = {
+              user_id: orderData.user_id,
+              restaurante_id: orderData.restaurante_id,
+              mesa_id: orderData.mesa_id,
+              capacidad: mesaActual.capacidad,
+              estado: "ocupado",
+              numero: mesaActual.numero
+            };
+
+            console.log('🪑 Payload para actualizar mesa:', mesaPayload);
+
+            const mesaUpdateResponse = await axios.put(`${Config.API_URL}/mesa/`, mesaPayload, {
+              headers: { 'Content-Type': 'application/json' },
+            });
+
+            console.log('✅ Estado de mesa actualizado a "ocupado"');
+          } else {
+            console.warn('⚠️ No se encontró información de la mesa:', orderData.mesa_id);
+          }
+        }
+      } catch (mesaError: any) {
+        console.error('❌ Error al actualizar estado de mesa:', mesaError.response?.data || mesaError.message);
+        // No lanzar error aquí para no afectar la creación del pedido
+        console.log('⚠️ Pedido creado exitosamente pero no se pudo actualizar el estado de la mesa');
+      }
+
       const newOrder: Order = {
         user_id: orderData.user_id,
         restaurante_id: orderData.restaurante_id,

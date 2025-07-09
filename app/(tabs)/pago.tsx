@@ -12,6 +12,7 @@ import { QRParamsIndicator } from '../../components/QRParamsIndicator';
 import { Config } from '../../constants/config';
 import { Dish } from '../../context/MenuContext';
 import { COLORS, FONT_SIZES, SPACING } from '../../theme';
+import { ScrollView } from 'react-native-gesture-handler';
 
 type CartItem = {
   dish: Dish;
@@ -36,6 +37,8 @@ export default function Pago() {
   const [tipIncluded, setTipIncluded] = useState(true);
   const [confirmModal, setConfirmModal] = useState(false);
   const [allUnpaidOrders, setAllUnpaidOrders] = useState<any[]>([]);
+  const [platosData, setPlatosData] = useState<Record<string, any>>({});
+  const [loading, setLoading] = useState(false);
 
   if (!mesa_id || !silla_id || !user_id || !restaurante_id) {
     return (
@@ -52,48 +55,86 @@ export default function Pago() {
     );
   }
 
-  // Cargar todos los pedidos listos para pagar (entregados)
+  // Cargar platos y pedidos listos para pagar
   React.useEffect(() => {
-    const fetchUnpaidOrders = async () => {
-      console.log('🔍 Buscando pedidos entregados para:', { user_id, restaurante_id });
+    const fetchData = async () => {
+      if (!user_id || !restaurante_id) return;
+      
+      setLoading(true);
+      console.log('🔍 Cargando datos para:', { user_id, restaurante_id, mesa_id });
       
       try {
+        // 1. Obtener todos los platos primero
+        console.log('📋 Obteniendo información de platos...');
+        const platosResponse = await fetch(
+          `${Config.API_URL}/platos/?user_id=${user_id}&restaurante_id=${restaurante_id}`
+        );
+        const platosData = await platosResponse.json();
+        
+        if (platosData && platosData.platos) {
+          setPlatosData(platosData.platos);
+          console.log('✅ Platos cargados:', Object.keys(platosData.platos).length);
+        }
+
+        // 2. Obtener pedidos de la mesa usando el endpoint de detalles
+        console.log('📦 Obteniendo pedidos de la mesa...');
         const response = await fetch(
-          `${Config.API_URL}/pedidos/?user_id=${user_id}&restaurante_id=${restaurante_id}`
+          `${Config.API_URL}/pedidos/mesa/?user_id=${user_id}&restaurante_id=${restaurante_id}&mesa_id=${mesa_id}`
         );
         const data = await response.json();
         
         console.log('📥 Respuesta del servidor:', data);
         
         if (data && data.pedidos) {
-          console.log('📦 Todos los pedidos:', Object.keys(data.pedidos));
+          console.log('📦 Todos los pedidos de la mesa:', Object.keys(data.pedidos));
           
-          // Filtrar solo pedidos que estén entregados y no pagados
-          const unpaidOrders = Object.entries(data.pedidos)
+          // 3. Filtrar solo pedidos que estén entregados (listos para pagar)
+          const pedidosEntregados = Object.entries(data.pedidos)
             .filter(([_, pedido]: [string, any]) => {
-              const estado = pedido.estados?.estado_actual || pedido.estado_actual || '';
-              const isPaid = pedido.paid;
-              console.log(`🔍 Pedido ${_}: estado=${estado}, paid=${isPaid}`);
-              return estado === 'entregado' && !isPaid;
+              const estado = pedido.estados?.estado_actual || '';
+              console.log(`🔍 Pedido ${_}: estado=${estado}`);
+              return estado === 'entregado';
             })
-            .map(([id, pedido]: [string, any]) => ({
-              ...pedido,
-              id,
-            }));
+            .map(([id, pedido]: [string, any]) => {
+              // 4. Mapear platos con información completa y calcular precios
+              const platosConInfo = Object.entries(pedido.platos || {}).map(([platoId, platoInfo]: [string, any]) => {
+                const platoDB = platosData.platos?.[platoId];
+                return {
+                  id: platoId,
+                  nombre: platoDB?.nombre || `Plato ${platoId}`,
+                  precio: platoDB?.precio || 0,
+                  cantidad: platoInfo.cantidad || 0,
+                  descripcion: platoDB?.descripcion || '',
+                  imagen: platoDB?.imagenUrl?.[0] || null,
+                  subtotal: (platoDB?.precio || 0) * (platoInfo.cantidad || 0)
+                };
+              });
+
+              const totalPedido = platosConInfo.reduce((sum, plato) => sum + plato.subtotal, 0);
+
+              return {
+                id,
+                ...pedido,
+                platosConInfo,
+                totalPedido,
+                fechaEntrega: pedido.estados?.entregado ? new Date(pedido.estados.entregado).toLocaleString() : 'N/A'
+              };
+            });
           
-          console.log('✅ Pedidos entregados filtrados:', unpaidOrders);
-          setAllUnpaidOrders(unpaidOrders);
-          console.log('📋 Pedidos entregados listos para pagar:', unpaidOrders.length);
+          console.log('✅ Pedidos entregados procesados:', pedidosEntregados);
+          setAllUnpaidOrders(pedidosEntregados);
+          console.log('📋 Total pedidos listos para pagar:', pedidosEntregados.length);
         }
       } catch (error) {
-        console.error('❌ Error al cargar pedidos entregados:', error);
+        console.error('❌ Error al cargar datos:', error);
+        Alert.alert('Error', 'No se pudieron cargar los pedidos. Intenta nuevamente.');
+      } finally {
+        setLoading(false);
       }
     };
 
-    if (user_id && restaurante_id) {
-      fetchUnpaidOrders();
-    }
-  }, [user_id, restaurante_id]);
+    fetchData();
+  }, [user_id, restaurante_id, mesa_id]);
 
   const lastUnpaidOrder = orders.findLast(o => !o.paid);
   const hasPendingOrder = carrito.length === 0 && !!lastUnpaidOrder;
@@ -112,15 +153,12 @@ export default function Pago() {
   const notesToShow = carrito.length > 0 ? notes : lastUnpaidOrder?.notes ?? '';
   const hasItems = items.length > 0 || allUnpaidOrders.length > 0;
 
-  // Calcular total incluyendo el carrito actual y todos los pedidos no pagados
+  // Calcular total basado en los precios reales del backend
   const carritoSubtotal = items.reduce((sum, i) => sum + i.dish.price * i.quantity, 0);
   
+  // Calcular subtotal de pedidos entregados usando los precios reales
   const pedidosSubtotal = allUnpaidOrders.reduce((sum, pedido) => {
-    return sum + Object.entries(pedido.platos || {}).reduce((platosSum, [platoId, platoInfo]: [string, any]) => {
-      // Aquí necesitarías mapear el precio del plato, por simplicidad usamos un precio base
-      // En un caso real, deberías hacer fetch de los precios o tenerlos en el pedido
-      return platosSum + (platoInfo.cantidad * 1000); // Precio estimado, debería venir del backend
-    }, 0);
+    return sum + (pedido.totalPedido || 0);
   }, 0);
 
   const subtotal = carritoSubtotal + pedidosSubtotal;
@@ -259,11 +297,15 @@ export default function Pago() {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       <Text style={styles.header}>PAGO</Text>
       <QRParamsIndicator />
 
-      {!hasItems ? (
+      {loading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text>Cargando pedidos...</Text>
+        </View>
+      ) : !hasItems ? (
         <Text style={styles.emptyText}>No hay productos en el carrito ni pedidos entregados listos para pagar</Text>
       ) : (
         <>
@@ -271,14 +313,30 @@ export default function Pago() {
           {allUnpaidOrders.length > 0 && (
             <>
               <Text style={styles.subheader}>📋 Pedidos entregados listos para pagar:</Text>
-              {allUnpaidOrders.map((pedido, index) => (
+              {allUnpaidOrders.map((pedido) => (
                 <View key={pedido.id} style={styles.orderCard}>
-                  <Text style={styles.orderTitle}>Pedido #{pedido.id} - ENTREGADO</Text>
-                  {Object.entries(pedido.platos || {}).map(([platoId, platoInfo]: [string, any], i) => (
-                    <Text key={i} style={styles.orderItem}>
-                      🍽 {platoId} x {platoInfo.cantidad}
-                    </Text>
+                  <Text style={styles.orderTitle}>Pedido #{pedido.id}</Text>
+                  <Text style={styles.orderSubtitle}>
+                    Entregado: {pedido.fechaEntrega}
+                  </Text>
+                  
+                  {pedido.platosConInfo?.map((plato: any, i: number) => (
+                    <View key={i} style={styles.orderItemRow}>
+                      <Text style={styles.orderItem}>
+                        🍽 {plato.nombre} x{plato.cantidad}
+                      </Text>
+                      <Text style={styles.orderItemPrice}>
+                        ${plato.subtotal.toLocaleString()}
+                      </Text>
+                    </View>
                   ))}
+                  
+                  <View style={styles.orderTotalRow}>
+                    <Text style={styles.orderTotal}>
+                      Total: ${pedido.totalPedido.toLocaleString()}
+                    </Text>
+                  </View>
+                  
                   {pedido.detalle && (
                     <Text style={styles.orderNotes}>📝 {pedido.detalle}</Text>
                   )}
@@ -379,7 +437,7 @@ export default function Pago() {
           </View>
         </View>
       </Modal>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -416,6 +474,11 @@ const styles = StyleSheet.create({
     borderLeftColor: '#4CAF50' 
   },
   orderTitle: { fontWeight: 'bold', fontSize: FONT_SIZES.body, marginBottom: SPACING.xs },
-  orderItem: { fontSize: FONT_SIZES.small, color: COLORS.grayDark, marginBottom: 2 },
+  orderSubtitle: { fontSize: FONT_SIZES.small, color: COLORS.grayDark, marginBottom: SPACING.xs },
+  orderItemRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 },
+  orderItem: { fontSize: FONT_SIZES.small, color: COLORS.grayDark, flex: 1 },
+  orderItemPrice: { fontSize: FONT_SIZES.small, color: COLORS.primary, fontWeight: 'bold' },
+  orderTotalRow: { marginTop: SPACING.xs, paddingTop: SPACING.xs, borderTopWidth: 1, borderTopColor: COLORS.grayLight },
+  orderTotal: { fontSize: FONT_SIZES.body, fontWeight: 'bold', color: COLORS.primary, textAlign: 'right' },
   orderNotes: { fontSize: FONT_SIZES.small, fontStyle: 'italic', color: COLORS.grayDark, marginTop: SPACING.xs },
 });

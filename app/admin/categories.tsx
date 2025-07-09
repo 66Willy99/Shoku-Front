@@ -519,7 +519,7 @@ const styles = StyleSheet.create({
         borderColor: Colors.primary,
         borderTopStartRadius: 10,
         borderTopEndRadius: 10,
-        minWidth: 505,
+        minWidth: 705,
         paddingHorizontal: 10,
     },
     headerCell: { 
@@ -537,7 +537,7 @@ const styles = StyleSheet.create({
         borderLeftWidth: 1,
         borderRightWidth: 1,
         borderColor: Colors.primary,
-        width: 505,
+        width: 705,
         minHeight: 60,
         alignItems: 'center',
         backgroundColor: '#ffffff',

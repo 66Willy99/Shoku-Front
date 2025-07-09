@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { View, Text, TouchableOpacity, ScrollView, Dimensions, StyleSheet, Alert } from "react-native";
+import { View, Text, TouchableOpacity, ScrollView, Dimensions, StyleSheet, Alert, Modal } from "react-native";
 import { useRouter } from "expo-router";
 import { Colors } from "@/constants/Colors";
 import Icon from '../../components/ui/Icon';
@@ -7,7 +7,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Config } from "@/constants/config";
 import { SvgXml } from "react-native-svg";
 import Swal from 'sweetalert2';
-import { useNotifications } from '../../hooks/useNotifications';
 
 // Manejo global de errores
 const handleError = (error: any, context: string) => {
@@ -51,7 +50,8 @@ const mesaOcupadaSVG = `
 </svg>
 `;
 
-const mesaPagadaSVG = `<svg height="150px" width="150px" version="1.1" id="_x32_" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="-128 -128 768.00 768.00" xml:space="preserve" fill="#000000" transform="rotate(-45)"><g id="SVGRepo_bgCarrier" stroke-width="0"><rect x="-128" y="-128" width="768.00" height="768.00" rx="384" fill="#7ed0ec" strokewidth="0"></rect></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <style type="text/css"> .st0{fill:#000000;} </style> <g> <path class="st0" d="M509.556,206.762c0.11-2.05,0.19-4.092,0.19-6.12c0.008-30.611-11.531-58.356-30.764-78.398 c-19.204-20.064-46.234-32.426-76.422-32.405c-29.458-0.007-53.534,4.894-75.787,9.569c-22.304,4.69-42.733,9.095-66.145,9.088 c-23.412,0-43.214-4.384-64.964-9.08c-21.698-4.668-45.271-9.584-74.73-9.576c-31.406,0.008-60.412,13.245-81.943,34.345 c-21.428,20.998-35.665,49.954-37.715,82.045H1.262C1.233,206.514,0,218.577,0,236.766c0.03,24.769,2.21,60.814,13.318,94.393 c5.587,16.79,13.435,33.026,24.755,46.766c11.283,13.727,26.242,24.886,45.052,30.75c24.973,7.833,41.318,10.707,57.378,10.685 c13.158-0.015,25.419-1.795,42.303-3.662c16.914-1.881,38.685-3.96,70.952-4.814l0.627-0.014l-0.605,0.014 c1.437-0.036,2.881-0.058,4.34-0.058c17.636-0.008,36.686,2.706,56.686,5.557c20.006,2.83,40.968,5.77,62.615,5.777 c12.611,0,25.469-1.014,38.444-3.684c20.86-4.259,37.86-13.865,50.953-26.578c19.693-19.102,30.756-44.578,37.138-70.113 c6.36-25.586,8.038-51.492,8.045-72.352C512,227.248,510.074,210.794,509.556,206.762z M19.853,208.139l0.007-0.32l3.727,0.226 c1.584-26.446,13.348-50.478,31.086-67.859c17.76-17.381,41.252-27.949,66.261-27.941c26.964,0.007,48.393,4.42,70.011,9.08 c21.567,4.632,43.404,9.576,69.682,9.576c26.278-0.007,48.611-4.93,70.747-9.569c22.18-4.66,44.221-9.08,71.185-9.088 c24.069,0.022,45.024,9.664,60.244,25.505c15.193,15.856,24.521,37.912,24.536,62.892c0,2.006-0.066,4.019-0.182,6.068 l-0.066,1.116l0.153,1.109l0.022,0.138c0.117,0.868,0.759,5.923,1.334,13.719c-4.521,21.064-15.17,39.99-29.925,54.439 c-18.387,18.008-42.798,29.014-68.88,29.014c-27.38-0.008-49.159-4.5-70.792-9.161c-21.596-4.646-43.09-9.496-68.895-9.496 c-25.804,0-47.816,4.843-69.982,9.489c-22.194,4.661-44.578,9.168-71.951,9.168c-25.082-0.015-47.05-10.116-62.936-26.658 c-11.006-11.48-18.942-26.111-22.836-42.616v-0.205c0-8.584,0.292-15.718,0.584-20.669c0.146-2.48,0.284-4.406,0.394-5.704 l0.124-1.445l0.044-0.43L19.853,208.139z M475.072,338.723c-5.747,14.332-13.544,27.132-23.835,37.08 c-10.32,9.949-23.062,17.235-39.896,20.736c-11.196,2.298-22.501,3.217-33.922,3.217c-19.598,0.008-39.516-2.721-59.472-5.558 c-19.955-2.815-39.939-5.762-59.829-5.776c-1.648,0-3.311,0.022-4.974,0.066l-0.306,0.014c-32.755,0.868-55.322,3.013-72.512,4.931 c-17.264,1.933-28.875,3.537-39.823,3.523c-13.296-0.022-26.65-2.166-50.682-9.664c-14.368-4.522-25.41-12.691-34.462-23.616 c-13.537-16.345-22.056-39.195-26.87-62.506c-1.619-7.768-2.8-15.55-3.705-23.15c2.968,4.186,6.141,8.22,9.671,11.903 c18.54,19.364,44.556,31.275,73.723,31.26c29.043,0,52.776-4.821,75.021-9.489c22.275-4.683,43.018-9.168,66.911-9.168 s44.031,4.478,65.752,9.161c21.684,4.668,44.892,9.496,73.935,9.496c30.341-0.008,58.436-12.8,79.331-33.281 c7.812-7.651,14.631-16.396,20.218-25.972C488.485,285.984,484.868,314.435,475.072,338.723z"></path> <path class="st0" d="M69.566,192.334c4.872,3.501,11.305,5.536,18.344,5.543c7.038-0.008,13.471-2.042,18.335-5.543 c4.836-3.465,8.235-8.664,8.235-14.674c0-6.017-3.399-11.225-8.235-14.696c-4.872-3.508-11.304-5.536-18.335-5.543 c-7.038,0.007-13.472,2.035-18.344,5.543c-4.836,3.471-8.234,8.679-8.234,14.696C61.332,183.67,64.73,188.87,69.566,192.334z M73.942,169.017c3.399-2.472,8.388-4.136,13.968-4.128c5.579-0.008,10.56,1.656,13.959,4.128c3.428,2.502,5.142,5.543,5.142,8.643 c0,3.078-1.714,6.119-5.142,8.621c-3.399,2.464-8.388,4.135-13.959,4.128c-5.58,0.008-10.569-1.663-13.968-4.128 c-3.427-2.502-5.141-5.543-5.141-8.621C68.801,174.56,70.515,171.519,73.942,169.017z"></path> <path class="st0" d="M154.959,178.688c4.872,3.508,11.305,5.536,18.343,5.543c7.038-0.007,13.472-2.035,18.336-5.543 c4.843-3.472,8.242-8.672,8.242-14.689c0-6.017-3.399-11.225-8.242-14.696c-4.864-3.508-11.298-5.536-18.336-5.543 c-7.038,0.007-13.471,2.035-18.343,5.543c-4.843,3.471-8.242,8.679-8.242,14.696C146.718,170.016,150.123,175.216,154.959,178.688z M159.335,155.356c3.399-2.465,8.396-4.136,13.967-4.128c5.572-0.008,10.561,1.663,13.968,4.128 c3.427,2.502,5.142,5.55,5.142,8.643c0,3.085-1.714,6.134-5.142,8.635c-3.406,2.466-8.396,4.136-13.968,4.129 c-5.572,0.007-10.568-1.663-13.967-4.129c-3.435-2.501-5.149-5.55-5.149-8.635C154.186,160.906,155.907,157.858,159.335,155.356z"></path> <path class="st0" d="M97.938,254.446c0,7.089,4.004,13.26,9.817,17.432c5.842,4.208,13.617,6.674,22.129,6.68 c8.526-0.007,16.308-2.472,22.143-6.68c5.82-4.172,9.818-10.343,9.818-17.432s-3.997-13.26-9.818-17.432 c-5.834-4.208-13.617-6.673-22.143-6.681c-8.512,0.008-16.287,2.473-22.129,6.681C101.942,241.186,97.938,247.357,97.938,254.446z M112.131,243.068c4.369-3.172,10.7-5.274,17.753-5.266c7.068-0.008,13.398,2.094,17.774,5.266 c4.398,3.202,6.717,7.221,6.717,11.378c0,4.158-2.32,8.176-6.717,11.378c-4.376,3.173-10.707,5.273-17.774,5.266 c-7.053,0.007-13.384-2.093-17.753-5.266c-4.405-3.202-6.725-7.22-6.725-11.378C105.406,250.289,107.726,246.27,112.131,243.068z"></path> <path class="st0" d="M225.918,249.48c4.675,3.362,10.845,5.309,17.592,5.317c6.754-0.008,12.931-1.954,17.614-5.317 c4.646-3.333,7.928-8.352,7.928-14.157c0-5.806-3.275-10.824-7.928-14.164c-4.683-3.37-10.86-5.317-17.614-5.324 c-6.747,0.007-12.917,1.954-17.592,5.324c-4.654,3.34-7.936,8.351-7.936,14.164C217.982,241.128,221.264,246.146,225.918,249.48z M230.294,227.212c3.209-2.334,7.935-3.916,13.216-3.909c5.302-0.007,10.028,1.575,13.238,3.909 c3.238,2.363,4.836,5.223,4.836,8.111c0,2.881-1.597,5.733-4.836,8.096c-3.209,2.334-7.935,3.916-13.238,3.909 c-5.281,0.007-10.007-1.575-13.223-3.909c-3.238-2.363-4.836-5.215-4.836-8.096C225.451,232.435,227.048,229.575,230.294,227.212z"></path> <path class="st0" d="M292.202,198.453c6.302,4.537,14.711,7.207,23.93,7.214c9.219-0.007,17.636-2.677,23.938-7.214 c6.265-4.5,10.553-11.13,10.553-18.722c0-7.593-4.281-14.23-10.553-18.73c-6.302-4.544-14.718-7.213-23.938-7.221 c-9.219,0.008-17.628,2.677-23.93,7.221c-6.272,4.5-10.554,11.137-10.554,18.73C281.648,187.324,285.929,193.954,292.202,198.453z M296.578,167.055c4.828-3.508,11.794-5.813,19.554-5.806c7.76-0.007,14.733,2.298,19.561,5.806 c4.858,3.53,7.462,8.008,7.462,12.676c0,4.66-2.604,9.132-7.462,12.669c-4.828,3.501-11.801,5.806-19.561,5.799 c-7.76,0.007-14.726-2.298-19.554-5.799c-4.865-3.537-7.461-8.008-7.461-12.669C289.116,175.063,291.72,170.585,296.578,167.055z"></path> <path class="st0" d="M366.326,252.244c5.011,3.603,11.64,5.696,18.89,5.704c7.25-0.008,13.872-2.101,18.883-5.704 c4.974-3.574,8.46-8.92,8.46-15.09c0-6.17-3.486-11.516-8.46-15.09c-5.011-3.603-11.633-5.689-18.883-5.696 c-7.25,0.008-13.88,2.094-18.89,5.696c-4.974,3.574-8.46,8.92-8.46,15.09C357.866,243.324,361.352,248.67,366.326,252.244z M370.702,228.116c3.537-2.56,8.716-4.288,14.514-4.281c5.791-0.007,10.969,1.722,14.507,4.281 c3.566,2.604,5.368,5.784,5.368,9.037c0,3.246-1.801,6.433-5.368,9.037c-3.538,2.567-8.716,4.295-14.507,4.288 c-5.799,0.007-10.978-1.722-14.514-4.288c-3.566-2.604-5.368-5.791-5.368-9.037C365.334,233.9,367.136,230.721,370.702,228.116z"></path> <path class="st0" d="M403.392,175.516c5.185,3.727,12.056,5.9,19.576,5.908c7.512-0.008,14.382-2.181,19.561-5.908 c5.156-3.698,8.752-9.219,8.752-15.58c0-6.367-3.596-11.888-8.752-15.586c-5.179-3.734-12.049-5.9-19.561-5.908 c-7.512,0.008-14.39,2.174-19.576,5.908c-5.164,3.698-8.768,9.212-8.768,15.586C394.624,166.304,398.228,171.818,403.392,175.516z M407.76,150.404c3.72-2.692,9.146-4.501,15.207-4.493c6.054-0.008,11.473,1.801,15.192,4.493c3.742,2.727,5.653,6.09,5.653,9.532 c0,3.436-1.911,6.79-5.653,9.526c-3.719,2.692-9.138,4.5-15.192,4.493c-6.054,0.008-11.487-1.801-15.207-4.5 c-3.756-2.728-5.667-6.09-5.667-9.518C402.093,156.494,404.004,153.139,407.76,150.404z"></path> </g> </g></svg>
+const mesaPagadaSVG = `
+<svg width="150px" height="150px" viewBox="-7.2 -7.2 38.40 38.40" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" stroke-width="0"><rect x="-7.2" y="-7.2" width="38.40" height="38.40" rx="19.2" fill="#ffb30f" strokewidth="0"></rect></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <circle cx="12" cy="12" r="9" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></circle> <path d="M14.5 9.08333L14.3563 8.96356C13.9968 8.66403 13.5438 8.5 13.0759 8.5H10.75C9.7835 8.5 9 9.2835 9 10.25V10.25C9 11.2165 9.7835 12 10.75 12H13.25C14.2165 12 15 12.7835 15 13.75V13.75C15 14.7165 14.2165 15.5 13.25 15.5H10.412C9.8913 15.5 9.39114 15.2969 9.01782 14.934L9 14.9167" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path> <path d="M12 8L12 7" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path> <path d="M12 17V16" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path> </g></svg>
 `;
 
 type Mesa = {
@@ -72,67 +72,12 @@ export default function GarzonLayout({ children }: { children: React.ReactNode }
     const [pedidosTerminados, setPedidosTerminados] = useState<any[]>([]);
     const [loadingMesas, setLoadingMesas] = useState(false);
     const [loadingPedidos, setLoadingPedidos] = useState(false);
+    const [modalVisible, setModalVisible] = useState(false);
+    const [selectedMesa, setSelectedMesa] = useState<Mesa | null>(null);
+    const [changingState, setChangingState] = useState(false);
     const ws = useRef<WebSocket | null>(null);
     const reconnectTimeout = useRef<NodeJS.Timeout | null>(null);
     
-    // Hook para notificaciones push
-    const { showLocalNotification, registerGarzonToken, testNotification } = useNotifications();
-
-    // Validación de rol y registro de token de notificaciones
-    useEffect(() => {
-        let isMounted = true;
-        
-        const checkRoleAndRegisterToken = async () => {
-            try {
-                const trabajadorStr = await AsyncStorage.getItem("trabajador");
-                if (!trabajadorStr && isMounted) {
-                    router.replace("/");
-                    return;
-                }
-                if (!isMounted || !trabajadorStr) return;
-                
-                const trabajador = JSON.parse(trabajadorStr);
-                if (trabajador.rol !== "garzon" && isMounted) {
-                    router.replace("/");
-                    return;
-                }
-
-                // Registrar token de notificaciones para garzón
-                if (isMounted) {
-                    const tokenRegistered = await AsyncStorage.getItem('garzonTokenRegistered');
-                    
-                    if (!tokenRegistered) {
-                        console.log('🔔 Registrando token de notificaciones para garzón...');
-                        
-                        const success = await registerGarzonToken(
-                            trabajador.user_id,
-                            trabajador.restaurante_id,
-                            trabajador.id || trabajador.trabajador_id
-                        );
-
-                        if (success) {
-                            console.log('✅ Token de garzón registrado exitosamente');
-                        } else {
-                            console.log('❌ No se pudo registrar el token de garzón');
-                        }
-                    } else {
-                        console.log('✅ Token de garzón ya está registrado');
-                    }
-                }
-            } catch (error) {
-                console.error("Error checking role and registering token:", error);
-                if (isMounted) {
-                    router.replace("/");
-                }
-            }
-        };
-        
-        checkRoleAndRegisterToken();
-        
-        return () => {
-            isMounted = false;
-        };
-    }, [router, registerGarzonToken]);
 
     // WebSocket para actualización de mesas y pedidos en tiempo real
     useEffect(() => {
@@ -227,12 +172,6 @@ export default function GarzonLayout({ children }: { children: React.ReactNode }
 
                                     // Mostrar notificación al garzón solo si el componente está montado
                                     if (isMounted) {
-                                        // Mostrar notificación push nativa (funciona con pantalla bloqueada)
-                                        await showLocalNotification(
-                                            "¡Pedido listo!",
-                                            `Pedido #${data.pedido_id} de la mesa ${detalle.mesa} terminado`,
-                                            { pedido_id: data.pedido_id, mesa: detalle.mesa }
-                                        );
                                         
                                         // Usar setTimeout para evitar problemas de concurrencia
                                         setTimeout(async () => {
@@ -325,6 +264,35 @@ export default function GarzonLayout({ children }: { children: React.ReactNode }
                                     prevPedidos.filter(p => p.pedido_id !== data.pedido_id)
                                 );
                             }
+                        }
+
+                        // Si el evento es solicitud de cliente
+                        if (data.evento === "solicitud_cliente") {
+                            if (!isMounted) return;
+                            
+                            console.log('🔔 Solicitud de cliente recibida:', data);
+                            
+                            // Mostrar alerta inmediata al garzón
+                            setTimeout(async () => {
+                                if (isMounted) {
+                                    try {
+                                        await Swal.fire({
+                                            title: "🔔 Llamada de Mesa",
+                                            text: `La Mesa ${data.mesa_numero || data.mesa_id || 'N/A'} solicita atención del mesero`,
+                                            icon: "info",
+                                            timer: 15000,
+                                            timerProgressBar: true,
+                                            showConfirmButton: true,
+                                            confirmButtonText: "Ok",
+                                            confirmButtonColor: Colors.secondary,
+                                            allowOutsideClick: false,
+                                            allowEscapeKey: false
+                                        });
+                                    } catch (alertError) {
+                                        console.log("Error mostrando alerta de solicitud cliente:", alertError);
+                                    }
+                                }
+                            }, 100);
                         }
                     } catch (err) {
                         console.log("Error procesando mensaje WS:", err);
@@ -441,27 +409,69 @@ export default function GarzonLayout({ children }: { children: React.ReactNode }
                 const data = await response.json();
                 
                 // 2. Filtrar y formatear pedidos terminados directamente
-                const pedidosTerminadosArray = Object.entries(data.pedidos)
-                    .filter(([_, pedido]: [string, any]) => pedido.estados?.estado_actual === "terminado")
-                    .map(([pedido_id, pedido]: [string, any]) => {
-                        // Obtener información de la mesa (necesitarías hacer un fetch adicional para obtener el número)
-                        // Por ahora usamos el mesa_id, pero podrías optimizar esto también
-                        return {
-                            pedido_id,
-                            mesa_numero: pedido.mesa_id, // Aquí podrías mapear el ID a número si tienes esa info
-                            platos: Object.entries(pedido.platos).map(([plato_id, platoInfo]: [string, any]) => ({
-                                nombre: plato_id, // Aquí también podrías mapear el ID al nombre real del plato
-                                cantidad: platoInfo.cantidad,
-                            })),
-                            estado_actual: pedido.estados.estado_actual,
-                            detalle: pedido.detalle || 'Sin detalle',
-                            hora_pedido: pedido.estados.terminado ? 
-                                new Date(pedido.estados.terminado).toLocaleTimeString() : 
-                                'No especificada'
-                        };
-                    });
+                const pedidosTerminadosArray = await Promise.all(
+                    Object.entries(data.pedidos)
+                        .filter(([_, pedido]: [string, any]) => pedido.estados?.estado_actual === "terminado")
+                        .map(async ([pedido_id, pedido]: [string, any]) => {
+                            try {
+                                // Obtener detalles completos del pedido para obtener nombres
+                                const detalleRes = await fetch(
+                                    `${Config.API_URL}/pedido/detalle?user_id=${user_id}&restaurante_id=${restaurante_id}&pedido_id=${pedido_id}`
+                                );
+                                const detalleData = await detalleRes.json();
+                                const detalle = detalleData.pedido_detalle;
+                                
+                                if (detalle) {
+                                    return {
+                                        pedido_id,
+                                        mesa_numero: detalle.mesa, // Ya viene el número de la mesa, no el ID
+                                        platos: Object.entries(detalle.platos).map(([nombre, cantidad]: [string, any]) => ({
+                                            nombre, // Ya viene el nombre del plato, no el ID
+                                            cantidad: Number(cantidad),
+                                        })),
+                                        estado_actual: detalle.estado_actual,
+                                        detalle: detalle.detalle || 'Sin detalle',
+                                        hora_pedido: pedido.estados.terminado ? 
+                                            new Date(pedido.estados.terminado).toLocaleTimeString() : 
+                                            'No especificada'
+                                    };
+                                } else {
+                                    // Fallback si no hay detalle disponible
+                                    return {
+                                        pedido_id,
+                                        mesa_numero: pedido.mesa_id,
+                                        platos: Object.entries(pedido.platos).map(([plato_id, platoInfo]: [string, any]) => ({
+                                            nombre: plato_id,
+                                            cantidad: platoInfo.cantidad,
+                                        })),
+                                        estado_actual: pedido.estados.estado_actual,
+                                        detalle: pedido.detalle || 'Sin detalle',
+                                        hora_pedido: pedido.estados.terminado ? 
+                                            new Date(pedido.estados.terminado).toLocaleTimeString() : 
+                                            'No especificada'
+                                    };
+                                }
+                            } catch (error) {
+                                console.error(`Error obteniendo detalle del pedido ${pedido_id}:`, error);
+                                // Fallback en caso de error
+                                return {
+                                    pedido_id,
+                                    mesa_numero: pedido.mesa_id,
+                                    platos: Object.entries(pedido.platos).map(([plato_id, platoInfo]: [string, any]) => ({
+                                        nombre: plato_id,
+                                        cantidad: platoInfo.cantidad,
+                                    })),
+                                    estado_actual: pedido.estados.estado_actual,
+                                    detalle: pedido.detalle || 'Sin detalle',
+                                    hora_pedido: pedido.estados.terminado ? 
+                                        new Date(pedido.estados.terminado).toLocaleTimeString() : 
+                                        'No especificada'
+                                };
+                            }
+                        })
+                );
 
-                setPedidosTerminados(pedidosTerminadosArray);
+                setPedidosTerminados(pedidosTerminadosArray.filter(Boolean)); // Filtrar elementos null/undefined
                 
             } catch (e) {
                 console.error("Error al cargar pedidos terminados:", e);
@@ -537,76 +547,127 @@ export default function GarzonLayout({ children }: { children: React.ReactNode }
         }
     };
 
-    // Función para probar notificaciones
-    const handleTestNotification = async () => {
+    const handleMesaPress = (mesa: Mesa) => {
+        setSelectedMesa(mesa);
+        setModalVisible(true);
+    };
+
+    const closeModal = () => {
+        setModalVisible(false);
+        setSelectedMesa(null);
+        setChangingState(false);
+    };
+
+    const handleChangeTableState = async () => {
+        if (!selectedMesa) return;
+        
+        // Guardar referencia a la mesa antes de cerrar el modal
+        const mesaRef = selectedMesa;
+        
+        // Cerrar el modal primero
+        closeModal();
+        
+        // Pequeña pausa para asegurar que el modal se cierre completamente
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Confirmación adicional con SweetAlert
+        const result = await Swal.fire({
+            title: "Confirmar cambio de estado",
+            text: `¿Estás seguro de que quieres marcar la Mesa #${mesaRef.numero} como disponible?`,
+            icon: "question",
+            showCancelButton: true,
+            confirmButtonText: "Sí, marcar como disponible",
+            cancelButtonText: "Cancelar",
+            confirmButtonColor: Colors.secondary,
+            cancelButtonColor: Colors.grey,
+        });
+
+        if (!result.isConfirmed) return;
+        
         try {
+            setChangingState(true);
+            
             const trabajadorStr = await AsyncStorage.getItem("trabajador");
-            if (!trabajadorStr) return;
+            if (!trabajadorStr) {
+                await Swal.fire({
+                    title: "Error",
+                    text: "No se pudo obtener información del trabajador",
+                    icon: "error",
+                    confirmButtonColor: Colors.primary,
+                });
+                return;
+            }
             
             const trabajador = JSON.parse(trabajadorStr);
+            const user_id = trabajador.user_id;
+            const restaurante_id = trabajador.restaurante_id;
             
-            const result = await testNotification(
-                trabajador.user_id,
-                trabajador.restaurante_id
-            );
-
-            if (result) {
+            if (!user_id || !restaurante_id) {
                 await Swal.fire({
-                    title: "🔔 Notificación enviada",
-                    text: "Se ha enviado una notificación de prueba a todos los garzones",
+                    title: "Error",
+                    text: "Información de trabajador incompleta",
+                    icon: "error",
+                    confirmButtonColor: Colors.primary,
+                });
+                return;
+            }
+
+            console.log(`Cambiando estado de mesa ${mesaRef.id} a disponible...`);
+            
+            const response = await fetch(`${Config.API_URL}/mesa/`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    user_id: user_id,
+                    restaurante_id: restaurante_id,
+                    mesa_id: mesaRef.id,
+                    capacidad: mesaRef.capacidad,
+                    estado: "disponible",
+                    numero: mesaRef.numero
+                })
+            });
+
+            if (response.ok) {
+                // Actualizar estado local inmediatamente
+                setMesas(prevMesas =>
+                    prevMesas.map(m =>
+                        m.id === mesaRef.id
+                            ? { ...m, estado: "disponible" }
+                            : m
+                    )
+                );
+                
+                // Mostrar confirmación de éxito con SweetAlert
+                await Swal.fire({
+                    title: "¡Estado actualizado!",
+                    text: `La Mesa #${mesaRef.numero} ahora está disponible`,
                     icon: "success",
-                    timer: 3000,
+                    timer: 2000,
                     showConfirmButton: false,
                 });
             } else {
+                const errorData = await response.json();
+                console.error("Error del servidor:", errorData);
                 await Swal.fire({
-                    title: "❌ Error",
-                    text: "No se pudo enviar la notificación de prueba",
+                    title: "Error",
+                    text: errorData.detail || "No se pudo cambiar el estado de la mesa",
                     icon: "error",
                     confirmButtonColor: Colors.primary,
                 });
             }
         } catch (error) {
-            console.error("Error en prueba de notificación:", error);
+            console.error("Error cambiando estado de mesa:", error);
             await Swal.fire({
-                title: "❌ Error",
-                text: "Error enviando notificación de prueba",
+                title: "Error de conexión",
+                text: "No se pudo conectar al servidor para cambiar el estado",
                 icon: "error",
                 confirmButtonColor: Colors.primary,
             });
+        } finally {
+            setChangingState(false);
         }
-    };
-
-    // Función para diagnosticar notificaciones
-    const handleDiagnosticarNotificaciones = async () => {
-        try {
-            await Swal.fire({
-                title: "🔍 Ejecutando diagnóstico...",
-                text: "Verificando configuración de notificaciones",
-                icon: "info",
-                timer: 2000,
-                showConfirmButton: false,
-            });
-
-            
-
-            
-        } catch (error) {
-            console.error("Error en diagnóstico:", error);
-            await Swal.fire({
-                title: "❌ Error",
-                text: "Error ejecutando diagnóstico de notificaciones",
-                icon: "error",
-                confirmButtonColor: Colors.primary,
-            });
-        }
-    };
-
-    const handleMesaPress = (mesa: Mesa) => {
-        Alert.alert(
-            `Mesa #${mesa.numero}`,
-            `Estado: ${mesa.estado}\n${mesa.hora_pedido ? `Hora del pedido: ${mesa.hora_pedido}` : ""}`
-        );
     };
 
     const getMesaSVG = (estado: string) => {
@@ -755,6 +816,49 @@ export default function GarzonLayout({ children }: { children: React.ReactNode }
             <View style={{ flex: 1 }}>
                 {children}
             </View>
+
+            {/* Modal para cambiar estado de mesa */}
+            <Modal
+                visible={modalVisible}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={closeModal}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContainer}>
+                        {selectedMesa && (
+                            <>
+                                <Text style={styles.modalTitle}>Mesa #{selectedMesa.numero}</Text>
+                                <Text style={styles.modalInfo}>Estado actual: {selectedMesa.estado}</Text>
+                                <Text style={styles.modalInfo}>Capacidad: {selectedMesa.capacidad}</Text>
+                                {selectedMesa.hora_pedido && (
+                                    <Text style={styles.modalInfo}>Hora del pedido: {selectedMesa.hora_pedido}</Text>
+                                )}
+
+                                {selectedMesa.estado !== "disponible" && selectedMesa.estado !== "ocupado" && (
+                                    <View style={styles.modalActions}>
+                                        <TouchableOpacity
+                                            style={[styles.modalButton, styles.confirmButton]}
+                                            onPress={handleChangeTableState}
+                                        >
+                                            <Text style={styles.confirmButtonText}>
+                                                Marcar como Disponible
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
+                                
+                                <TouchableOpacity
+                                    style={[styles.modalButton, styles.cancelButton]}
+                                    onPress={closeModal}
+                                >
+                                    <Text style={styles.cancelButtonText}>Cerrar</Text>
+                                </TouchableOpacity>
+                            </>
+                        )}
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -874,5 +978,60 @@ const styles = StyleSheet.create({
         color: "#fff",
         fontWeight: "bold",
         fontSize: 14,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    modalContainer: {
+        backgroundColor: "#fff",
+        borderRadius: 12,
+        padding: 24,
+        margin: 20,
+        minWidth: 300,
+        maxWidth: "90%",
+        elevation: 5,
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: "bold",
+        color: Colors.primary,
+        marginBottom: 16,
+        textAlign: "center",
+    },
+    modalInfo: {
+        fontSize: 16,
+        color: Colors.primary,
+        marginBottom: 8,
+        textAlign: "center",
+    },
+    modalActions: {
+        marginTop: 20,
+        marginBottom: 10,
+    },
+    modalButton: {
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        borderRadius: 8,
+        marginVertical: 6,
+        alignItems: "center",
+    },
+    confirmButton: {
+        backgroundColor: Colors.secondary,
+    },
+    confirmButtonText: {
+        color: "#fff",
+        fontWeight: "bold",
+        fontSize: 16,
+    },
+    cancelButton: {
+        backgroundColor: Colors.grey,
+    },
+    cancelButtonText: {
+        color: "#fff",
+        fontWeight: "bold",
+        fontSize: 16,
     },
 });

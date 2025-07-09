@@ -6,22 +6,75 @@ import {
   TouchableOpacity,
   Modal,
   StyleSheet,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { COLORS, FONT_SIZES, SPACING } from '../../theme';
 import { useOrders } from '../../context/OrdersContext';
 import { useQRParams } from '../../context/QRParamsContext';
+import { Config } from '../../constants/config';
 
 export default function Home() {
   const router = useRouter();
   const { qrParams } = useQRParams();
+  // Usar parámetros del contexto QR para identificación de mesa/usuario
+  const mesa_id = qrParams?.mesaId || '';
+  const silla_id = qrParams?.sillaId || '';
+  const user_id = qrParams?.userId || '';
+  const restaurante_id = qrParams?.restauranteId || '';
 
   const [waiterModal, setWaiterModal] = useState(false);
+  const [isCallinguWaiter, setIsCallingWaiter] = useState(false);
   const { orders } = useOrders();
 
-  const showWaiter = () => {
-    setWaiterModal(true);
-    setTimeout(() => setWaiterModal(false), 2000);
+  const callWaiter = async () => {
+    if (!user_id || !restaurante_id || !mesa_id) {
+      Alert.alert(
+        'Error',
+        'No se puede llamar al mesero. Faltan parámetros de mesa o usuario.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    setIsCallingWaiter(true);
+
+    try {
+      console.log('📞 Llamando mesero para mesa:', { user_id, restaurante_id, mesa_id });
+
+      const response = await fetch(`${Config.API_URL}/mesa/llamar-garzon`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: user_id,
+          restaurante_id: restaurante_id,
+          mesa_id: mesa_id,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error HTTP: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ Mesero llamado exitosamente:', data);
+
+      // Mostrar modal solo si el POST fue exitoso
+      setWaiterModal(true);
+      setTimeout(() => setWaiterModal(false), 3000);
+
+    } catch (error) {
+      console.error('❌ Error al llamar al mesero:', error);
+      Alert.alert(
+        'Error',
+        'No se pudo notificar al mesero. Verifica tu conexión e intenta nuevamente.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsCallingWaiter(false);
+    }
   };
 
   const tienePedidoNoPagado = orders.some(o => !o.paid);
@@ -46,7 +99,7 @@ export default function Home() {
         <Text style={styles.buttonText}>📋 Ver Carta</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity onPress={showWaiter} style={[styles.button, styles.secondaryButton]}>
+      <TouchableOpacity onPress={callWaiter} style={[styles.button, styles.secondaryButton]}>
         <Text style={styles.buttonText}>🔔 Llamar a Mesero</Text>
       </TouchableOpacity>
 

@@ -528,7 +528,7 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         padding: 0, // Cambiamos a 0 para manejar el padding internamente
         width: 160,
-        minHeight: 240, // Aumentamos la altura para acomodar la imagen
+        minHeight: 320, // Aumentamos la altura para acomodar la imagen
         elevation: 3,
         shadowColor: '#000',
         shadowOpacity: 0.2,

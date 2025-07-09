@@ -26,11 +26,11 @@ export default function AdminScreen() {
 
     const [mesas, setMesas] = useState<{ id: string; numero: string | number; estado: string; capacidad: number }[]>([]);
     const [modalVisible, setModalVisible] = useState(false);
-    const [selectedMesa, setSelectedMesa] = useState<{ id: string; numero: string | number; estado: string; capacidad: number } | null>(null);
+    const [selectedMesa, setSelectedMesa] = useState<{ id: string; numero: number; estado: string; capacidad: number } | null>(null);
     const [nuevoEstado, setNuevoEstado] = useState<string>("");
-    const [sillas, setSillas] = useState<{ id: string; mesa_id: string }[]>([]);
+    const [sillas, setSillas] = useState<{ id: string; mesa_id: string; numero: number }[]>([]);
     const [qrMesaId, setQrMesaId] = useState<string | null>(null);
-    const [qrSillas, setQrSillas] = useState<{ id: string; mesa_id: string }[]>([]);
+    const [qrSillas, setQrSillas] = useState<{ id: string; mesa_id: string; numero: number }[]>([]);
     const [qrVisible, setQrVisible] = useState(false);
     const slideAnim = useRef(new Animated.Value(-Dimensions.get("window").height)).current; // Empieza fuera de pantalla arriba
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -73,10 +73,19 @@ export default function AdminScreen() {
             try{
             const res = await fetch(`${Config.API_URL}/silla/all?user_id=${user_id}&restaurante_id=${restaurante_id}`);
             const data = await res.json();
+            
+            console.log("🪑 Estructura de sillas del backend:", data);
+            
             // Ajusta según la estructura real de tu backend
             const sillasArray = Array.isArray(data.sillas)
                 ? data.sillas
-                : Object.keys(data.sillas).map((key) => ({ id: key, ...data.sillas[key] }));
+                : Object.keys(data.sillas).map((key) => ({ 
+                    id: key, 
+                    mesa_id: data.sillas[key].mesa_id,
+                    numero: data.sillas[key].numero
+                }));
+            
+            console.log("🪑 Sillas procesadas:", sillasArray);
             setSillas(sillasArray);
             }catch(err){
                 console.error('Error al obtener sillas:', err);
@@ -94,7 +103,10 @@ export default function AdminScreen() {
     }, [selectedMesa]);
 
     const openModal = (mesa: { id: string; numero: string | number; estado: string; capacidad: number }) => {
-        setSelectedMesa(mesa);
+        setSelectedMesa({
+            ...mesa,
+            numero: typeof mesa.numero === "number" ? mesa.numero : parseInt(mesa.numero, 10),
+        });
         setModalVisible(true);
         slideAnim.setValue(-Dimensions.get("window").height); // Arriba de la pantalla
         Animated.timing(slideAnim, {
@@ -152,9 +164,22 @@ export default function AdminScreen() {
     };
 
     const openQrModal = (mesaId: string) => {
+        const mesaSeleccionada = mesas.find(mesa => mesa.id === mesaId);
         const sillasMesa = sillas.filter(silla => silla.mesa_id === mesaId);
+        
+        // Ordenar sillas por número para mostrarlas en orden
+        const sillasOrdenadas = sillasMesa.sort((a, b) => a.numero - b.numero);
+        
+        // Establecer la mesa seleccionada para mostrar su número en el modal
+        if (mesaSeleccionada) {
+            setSelectedMesa({
+                ...mesaSeleccionada,
+                numero: typeof mesaSeleccionada.numero === "number" ? mesaSeleccionada.numero : parseInt(mesaSeleccionada.numero, 10),
+            });
+        }
+        
         setQrMesaId(mesaId);
-        setQrSillas(sillasMesa);
+        setQrSillas(sillasOrdenadas);
         setQrVisible(true);
     };
 
@@ -162,7 +187,7 @@ export default function AdminScreen() {
         return <Redirect href="/" />;
     }
 
-    const estadosMesa = ["en preparacion", "disponible", "ocupado", "terminado", "pagado"];
+    const estadosMesa = ["disponible", "ocupado", "pagado"];
 
     if (isSubmitting) {
         return (<LoadingScreen message="Cargando mesas..." />);
@@ -178,16 +203,12 @@ export default function AdminScreen() {
                             styles.mesa,
                             {
                                 backgroundColor:
-                                    mesa.estado === "en preparacion"
-                                        ? "#ffe082"
-                                        : mesa.estado === "disponible"
+                                    mesa.estado === "disponible"
                                         ? "#c8e6c9"
                                         : mesa.estado === "ocupado"
                                         ? "#ffab91"
-                                        : mesa.estado === "terminado"
-                                        ? "#b3e5fc"
                                         : mesa.estado === "pagado"
-                                        ? "#d1c4e9"
+                                        ? "#ffb30f"
                                         : "white",
                             },
                         ]}
@@ -281,7 +302,10 @@ export default function AdminScreen() {
             >
                 <Pressable
                     style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.8)", justifyContent: "center", alignItems: "center" }}
-                    onPress={() => setQrVisible(false)}
+                    onPress={() => {
+                        setQrVisible(false);
+                        setSelectedMesa(null); // Limpiar mesa seleccionada
+                    }}
                 >
                     <View
                         style={{
@@ -304,15 +328,24 @@ export default function AdminScreen() {
                                 qrSillas.map((silla) => (
                                     <View key={silla.id} style={{ marginBottom: 24, alignItems: "center" }}>
                                         <QRCodeSVG value={`${Config.APP_URL}/${user_id}/${restaurante_id}/${qrMesaId}/${silla.id}`}/>
-                                        <Text style={{ color: "#333", marginBottom: 4, textAlign: "center" }}>
-                                            Silla ID: {silla.id}
+                                        <Text style={{ 
+                                            color: "#333", 
+                                            marginBottom: 4, 
+                                            textAlign: "center",
+                                            fontSize: 16,
+                                            fontWeight: "bold"
+                                        }}>
+                                            Silla #{silla.numero}
                                         </Text>
                                     </View>
                                 ))
                             )}
                         </ScrollView>
                         <TouchableOpacity
-                            onPress={() => setQrVisible(false)}
+                            onPress={() => {
+                                setQrVisible(false);
+                                setSelectedMesa(null); // Limpiar mesa seleccionada
+                            }}
                             style={{
                                 backgroundColor: "#ee7b6c",
                                 paddingHorizontal: 24,
