@@ -1,74 +1,178 @@
-import { Image, StyleSheet, Platform } from 'react-native';
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  Image,
+  TouchableOpacity,
+  Modal,
+  StyleSheet,
+  Alert,
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import { COLORS, FONT_SIZES, SPACING } from '../../theme';
+import { useOrders } from '../../context/OrdersContext';
+import { useQRParams } from '../../context/QRParamsContext';
+import { Config } from '../../constants/config';
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+export default function Home() {
+  const router = useRouter();
+  const { qrParams } = useQRParams();
+  // Usar parámetros del contexto QR para identificación de mesa/usuario
+  const mesa_id = qrParams?.mesaId || '';
+  const silla_id = qrParams?.sillaId || '';
+  const user_id = qrParams?.userId || '';
+  const restaurante_id = qrParams?.restauranteId || '';
 
-export default function HomeScreen() {
+  const [waiterModal, setWaiterModal] = useState(false);
+  const [isCallinguWaiter, setIsCallingWaiter] = useState(false);
+  const { orders } = useOrders();
+
+  const callWaiter = async () => {
+    if (!user_id || !restaurante_id || !mesa_id) {
+      Alert.alert(
+        'Error',
+        'No se puede llamar al mesero. Faltan parámetros de mesa o usuario.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    setIsCallingWaiter(true);
+
+    try {
+      console.log('📞 Llamando mesero para mesa:', { user_id, restaurante_id, mesa_id });
+
+      const response = await fetch(`${Config.API_URL}/mesa/llamar-garzon`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: user_id,
+          restaurante_id: restaurante_id,
+          mesa_id: mesa_id,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error HTTP: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ Mesero llamado exitosamente:', data);
+
+      // Mostrar modal solo si el POST fue exitoso
+      setWaiterModal(true);
+      setTimeout(() => setWaiterModal(false), 3000);
+
+    } catch (error) {
+      console.error('❌ Error al llamar al mesero:', error);
+      Alert.alert(
+        'Error',
+        'No se pudo notificar al mesero. Verifica tu conexión e intenta nuevamente.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsCallingWaiter(false);
+    }
+  };
+
+  const tienePedidoNoPagado = orders.some(o => !o.paid);
+
+  const irACarta = () => {
+    router.push('/carta');
+  };
+
+  const irAPago = () => {
+    router.push('/pago');
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12'
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          Tap the Explore tab to learn more about what's included in this starter app.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          When you're ready, run{' '}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    <View style={styles.container}>
+      <Image
+        source={require('../../assets/images/shoku-logo.png')}
+        style={styles.logo}
+        resizeMode="contain"
+      />
+
+      <TouchableOpacity onPress={irACarta} style={styles.button}>
+        <Text style={styles.buttonText}>📋 Ver Carta</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity onPress={callWaiter} style={[styles.button, styles.secondaryButton]}>
+        <Text style={styles.buttonText}>🔔 Llamar a Mesero</Text>
+      </TouchableOpacity>
+
+      {tienePedidoNoPagado && (
+        <TouchableOpacity onPress={irAPago} style={[styles.button, styles.payButton]}>
+          <Text style={styles.buttonText}>💳 Pagar pedido actual</Text>
+        </TouchableOpacity>
+      )}
+
+      <Modal visible={waiterModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>🧑‍🍳 Mesero en camino</Text>
+            <Text style={styles.modalMsg}>⏰ Tiempo estimado: 3 minutos</Text>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
+    padding: SPACING.md,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  logo: {
+    width: 140,
+    height: 140,
+    marginBottom: SPACING.xl,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  button: {
+    width: '80%',
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.md,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
+  secondaryButton: {
+    backgroundColor: COLORS.secondary,
+  },
+  payButton: {
+    backgroundColor: COLORS.primary,
+  },
+  buttonText: {
+    color: COLORS.white,
+    fontSize: FONT_SIZES.body,
+    fontWeight: 'bold',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalBox: {
+    backgroundColor: COLORS.white,
+    padding: SPACING.lg,
+    borderRadius: 12,
+    alignItems: 'center',
+    width: '80%',
+  },
+  modalTitle: {
+    fontSize: FONT_SIZES.subtitle,
+    fontWeight: 'bold',
+    marginBottom: SPACING.sm,
+  },
+  modalMsg: {
+    fontSize: FONT_SIZES.body,
+    color: COLORS.grayDark,
   },
 });

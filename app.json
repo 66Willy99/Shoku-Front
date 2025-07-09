@@ -1,13 +1,29 @@
+
 {
   "expo": {
     "name": "Shoku",
     "slug": "Shoku",
     "version": "1.0.0",
+    "scheme": "myapp",           
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "myapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ]
+    ],
+    "platforms": ["ios", "android", "web"],
+    "extra": {
+      "API_URL": "http://192.168.18.157:8000"
+    },
     "ios": {
       "supportsTablet": true
     },
@@ -22,18 +38,6 @@
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
-    "plugins": [
-      "expo-router",
-      [
-        "expo-splash-screen",
-        {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
-        }
-      ]
-    ],
     "experiments": {
       "typedRoutes": true
     }
